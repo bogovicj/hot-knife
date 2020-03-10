@@ -17,14 +17,19 @@ import bdv.util.volatiles.VolatileViews;
 import ij.IJ;
 import ij.ImageJ;
 import ij.ImagePlus;
+import net.imglib2.Point;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.RealRandomAccessible;
 import net.imglib2.Volatile;
+import net.imglib2.bspline.BSplineCoefficientsInterpolator;
+import net.imglib2.bspline.BSplineCoefficientsInterpolatorFactory;
 import net.imglib2.bspline.BSplineDecomposition;
 import net.imglib2.converter.Converters;
 import net.imglib2.img.array.ArrayImg;
 import net.imglib2.img.array.ArrayImgs;
+import net.imglib2.img.array.ArrayRandomAccess;
 import net.imglib2.img.basictypeaccess.AccessFlags;
 import net.imglib2.img.basictypeaccess.array.DoubleArray;
 import net.imglib2.img.imageplus.ImagePlusImgs;
@@ -63,56 +68,99 @@ public class LazyBSpline {
 						new DoubleType());
 		
 		ExtendedRandomAccessibleInterval<DoubleType, RandomAccessibleInterval<DoubleType>> ext = Views.extendMirrorSingle( imgDouble );
-		final BSplineDecomposition<DoubleType,DoubleType> coefsAlg = new BSplineDecomposition<DoubleType,DoubleType>( 
+
+
+//		// not lazy
+//		final BSplineDecomposition<DoubleType,DoubleType> coefsAlg = new BSplineDecomposition<DoubleType,DoubleType>( 
+//				3, ext );
+//		ArrayImg<DoubleType, DoubleArray> coefImg = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
+//		coefsAlg.accept( coefImg );
+//		System.out.println( "done" );
+
+
+//		
+//		// not lazy ( subset )
+//		final BSplineDecomposition<DoubleType,DoubleType> coefsAlgSub = new BSplineDecomposition<DoubleType,DoubleType>( 
+//				3, ext );
+//		ArrayImg<DoubleType, DoubleArray> coefSubset = ArrayImgs.doubles( 50, 50, 50 );
+//		IntervalView<DoubleType> coefOffset = Views.translate( coefSubset, 200, 50, 50 );
+//
+//		ArrayImg<DoubleType, DoubleArray> coefSubImg = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
+//		coefsAlgSub.accept( coefOffset );
+//		System.out.println( "done" );
+
+
+		final BSplineDecomposition<DoubleType,DoubleType> coefsAlgForLazy = new BSplineDecomposition<DoubleType,DoubleType>( 
 				3, ext );
-
-		// not lazy
-		ArrayImg<DoubleType, DoubleArray> coefImg = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
-		coefsAlg.accept( coefImg );
-		System.out.println( "done" );
-		
-		// not lazy ( subset )
-		ArrayImg<DoubleType, DoubleArray> coefSubset = ArrayImgs.doubles( 50, 50, 50 );
-		IntervalView<DoubleType> coefOffset = Views.translate( coefSubset, 100, 50, 50 );
-
-		ArrayImg<DoubleType, DoubleArray> coefSubImg = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
-		coefsAlg.accept( coefOffset );
-		System.out.println( "done" );
-
 		// lazy
 		final RandomAccessibleInterval<DoubleType> coefImgLazy = Lazy.process(
 				img,
 				blockSize,
 				new DoubleType(),
 				AccessFlags.setOf( AccessFlags.VOLATILE ),
-				coefsAlg);
+				coefsAlgForLazy);
+		
+//		RealRandomAccessible<DoubleType> interpImg = Views.interpolate( 
+//				Views.extendZero( coefImg ), new BSplineCoefficientsInterpolatorFactory( 3 ));
 
+		RealRandomAccessible<DoubleType> interpImg = Views.interpolate( 
+				Views.extendZero( coefImgLazy ), new BSplineCoefficientsInterpolatorFactory( 3 ));
+		
 
+		// LOOKING GOOD
+//		BSplineCoefficientsInterpolator interpImg = new BSplineCoefficientsInterpolator(coefImg, 3);
+//		
+//		Point p = new Point( 3 ); 
+//		p.setPosition(new int[]{ 250, 75, 100 });
+//
+//		ArrayRandomAccess<DoubleType> coefAccess = coefImg.randomAccess();
+//		coefAccess.setPosition( p );
+//		System.out.println( coefAccess.get() );
+//
+//		interpImg.setPosition( p );
+//		System.out.println( interpImg.get() );
+	
+	
+	
 		BdvOptions options = BdvOptions.options().numRenderingThreads( 24 );
 	
 		final BdvStackSource<DoubleType> imgSrc =
 				BdvFunctions.show(
 						imgDouble,
 						"img");
-		imgSrc.setDisplayRange( 0, 255 );
 		
-		BdvStackSource< DoubleType > coefSrc =
+		final BdvStackSource<DoubleType> imgReal =
 				BdvFunctions.show(
-						coefImg,
-						"coefs",
-						options.addTo( imgSrc ) );
+						interpImg,
+						imgDouble,
+						"img interp",
+						options.addTo( imgSrc ));
+		
+		
+//		BdvStackSource< DoubleType > coefSrc =
+//				BdvFunctions.show(
+//						coefImg,
+//						"coefs",
+//						options.addTo( imgReal ));
+		
+		
 
-		BdvStackSource< DoubleType > coefSubSrc =
-				BdvFunctions.show(
-						coefOffset,
-						"coefs offset",
-						options.addTo( imgSrc ) );
+
+//		BdvStackSource< DoubleType > coefSubSrc =
+//				BdvFunctions.show(
+//						coefOffset,
+//						"coefs offset",
+//						options.addTo( imgSrc ) );
+		
+
 
 //		BdvStackSource< Volatile<DoubleType> > coefSrcLazy =
 //				BdvFunctions.show(
 //						VolatileViews.wrapAsVolatile( coefImgLazy ),
 //						"coefs Lazy",
 //						options.addTo( imgSrc ) );
+		
+		
 
 	}
 }
