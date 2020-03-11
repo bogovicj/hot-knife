@@ -11,9 +11,7 @@ import net.imglib2.Point;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
-import net.imglib2.img.array.ArrayImgFactory;
 import net.imglib2.iterator.IntervalIterator;
-import net.imglib2.loops.LoopBuilder;
 import net.imglib2.transform.integer.MixedTransform;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.util.Intervals;
@@ -23,7 +21,7 @@ import net.imglib2.view.Views;
 
 /**
  * 
- * Bspline coefficient.
+ * Compute Bspline coefficients from an image.
  * 
  * @author John Bogovic
  *
@@ -39,10 +37,12 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	protected final double[] Ci;
 
 	protected final RandomAccessible<T> img;
-	
-	protected RandomAccessibleInterval<S> tmp;
-	
+
 	protected double tolerance = 1e-6;
+
+	protected int paddingWidth = 7;
+	
+	protected double[] padding;
 
 	public BSplineDecomposition( final int order, final RandomAccessible<T> img )
 	{
@@ -54,6 +54,8 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		this.poles = poles( order );
 		this.numberOfPoles = poles.length;
 		Ci = polesCi( poles );
+		
+		padding = new double[ paddingWidth ];
 	}
 
 	/**
@@ -74,9 +76,14 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		return Ci;
 	}
 
-
 	// for debug purposes, keep track of how many times accept method is called
 	private long acceptCount = 0;
+
+	/**
+	 * Compute coefficients.
+	 * 
+	 * @param coefficients the interval and destination in which to store coefficients.
+	 */
 	@SuppressWarnings("unchecked")
 	@Override
 	public void accept( final RandomAccessibleInterval< S > coefficients )
@@ -123,89 +130,6 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 							tolerance, numberOfPoles, poles, Ci );
 			}
 		}
-
-//		long endTime = System.currentTimeMillis();
-//		System.out.println( "took " + (endTime - startTime) +" ms" );
-	}
-
-
-	@SuppressWarnings("unchecked")
-	public void acceptCopyFromTmp( final RandomAccessibleInterval< S > coefficients )
-	{
-//		System.out.println(" input itvl: " + Util.printInterval(coefficients));
-//		long startTime = System.currentTimeMillis();
-
-		int nd = img.numDimensions();
-	
-		RandomAccess<T> imgAccess = img.randomAccess();
-		RandomAccess<S> coefAccess = coefficients.randomAccess();
-		RandomAccess<S> coefExtAccess = Views.extendMirrorSingle( coefficients ).randomAccess();
-
-		Point startPoint = new Point( Intervals.minAsLongArray( coefficients ));
-		imgAccess.setPosition( startPoint );
-		coefAccess.setPosition( startPoint );
-		coefExtAccess.setPosition( startPoint );
-
-		S var = coefAccess.get().createVariable();
-
-		
-		long[] pad = new long[ nd ];
-		Arrays.fill(pad, 3);
-
-		Interval itvl = Intervals.expand( coefficients, pad );
-		if ( tmp == null )
-		{
-			tmp = Views.translate(
-					Util.getSuitableImgFactory( itvl, var.copy()).create( itvl ),
-					Intervals.minAsLongArray( itvl ) );
-
-//			System.out.println( "tmp itvl: " + Util.printInterval(tmp));
-		}
-
-		RandomAccess<S> coefTmpAccess = tmp.randomAccess();
-		RandomAccess<S> coefTmpExtAccess = Views.extendMirrorSingle( tmp ).randomAccess();
-
-
-		coefTmpAccess.setPosition( startPoint );
-		coefTmpExtAccess.setPosition( startPoint );
-
-		for( int d = 0; d < nd; d++ )
-		{
-			@SuppressWarnings("rawtypes")
-			RandomAccess dataAccess;
-			if( d == 0 )
-				dataAccess = imgAccess;
-			else
-			{
-//				dataAccess = coefExtAccess;
-				dataAccess = coefTmpExtAccess;
-			}
-
-//			IntervalIterator it = getIterator( coefficients, d );
-			IntervalIterator it = getIterator( itvl, d );
-
-			while( it.hasNext() )
-			{
-				it.fwd();
-				coefAccess.setPosition( it );
-				dataAccess.setPosition( it );
-				
-//				recursion1d( dataAccess, coefAccess, var,
-//							coefficients.dimension( d ), d,
-//							tolerance, numberOfPoles, poles, Ci );
-
-				// work on tmp access
-				coefTmpAccess.setPosition( it );
-				recursion1d( dataAccess, coefTmpAccess, var,
-							tmp.dimension( d ), d,
-							tolerance, numberOfPoles, poles, Ci );
-
-			}
-		}
-
-		// copy into destination access 
-		LoopBuilder.setImages( Views.interval(tmp, coefficients ), coefficients ).forEachPixel(
-				(x,y) -> y.set( x ));
 
 //		long endTime = System.currentTimeMillis();
 //		System.out.println( "took " + (endTime - startTime) +" ms" );
@@ -316,7 +240,7 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	 * @param poles the poles
 	 * @param Ci Ci
 	 */
-	public static <S extends RealType<S>, T extends RealType<T>> void recursion1dOrig(
+	public static <S extends RealType<S>, T extends RealType<T>> void recursion1dUnpadded(
 			final RandomAccess<T> srcAccess,
 			final RandomAccess<S> destAccess,
 			final S previous,
@@ -377,6 +301,8 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 			}
 		}
 	}
+	
+	int debugPos = 220;
 
 	/**
 	 * Compute a 1d forward-backward recursion to compute bspline coefficients.
@@ -398,7 +324,7 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	 * @param poles the poles
 	 * @param Ci Ci
 	 */
-	public static <S extends RealType<S>, T extends RealType<T>> void recursion1d(
+	public <S extends RealType<S>, T extends RealType<T>> void recursion1d(
 			final RandomAccess<T> srcAccess,
 			final RandomAccess<S> destAccess,
 			final S previous,
@@ -409,6 +335,7 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 			final double[] poles,
 			final double[] Ci )
 	{
+		boolean debug = false;
 		for( int pole_idx = 0; pole_idx < numberOfPoles; pole_idx++ )
 		{
 			double z = poles[ pole_idx ];
@@ -432,47 +359,56 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				coef.add( previous );
 				
 				previous.set( coef );
+				
+				if( destAccess.getIntPosition(0) == debugPos || debug )
+				{
+					System.out.println( "fwd coef at " + destAccess.getIntPosition(0) + " : " + coef );
+//					debug = true;
+				}
 			}
 			// here, destAccess at position N-1
 			
-			// go a little further
-			// N 
-			srcAccess.fwd( dimension );
-			double plus1 = previous.getRealDouble() + z * srcAccess.get().getRealDouble();
-
-			// N+1
-			srcAccess.fwd( dimension );
-			double plus2 = plus1 + z * srcAccess.get().getRealDouble();
-
-			// N+2
-			srcAccess.fwd( dimension );
-			double plus3 = plus2 + z * srcAccess.get().getRealDouble();
-	
-			// initialize reverse
-			// replaces call to initializeAntiCausalCoefficients
-			plus3 += z * plus2;
-			plus3 *= Ci[pole_idx];
-
+			System.out.println( " dest pos after fwd : " + Util.printCoordinates( destAccess ));
 			
-			// go backwards
-			plus2 -= plus3;
-			plus2 *= -z;
+//			// go a little further
+//			// N 
+//			srcAccess.fwd( dimension );
+//			double plus1 = previous.getRealDouble() + z * srcAccess.get().getRealDouble();
+//
+//			// N+1
+//			srcAccess.fwd( dimension );
+//			double plus2 = plus1 + z * srcAccess.get().getRealDouble();
+//
+//			// N+2
+//			srcAccess.fwd( dimension );
+//			double plus3 = plus2 + z * srcAccess.get().getRealDouble();
+//	
+//			// initialize reverse
+//			// replaces call to initializeAntiCausalCoefficients
+//			plus3 += z * plus2;
+//			plus3 *= Ci[pole_idx];
+//
+//	
+//			// go backwards
+//			plus2 -= plus3;
+//			plus2 *= -z;
+//
+//			plus1 -= plus2;
+//			plus1 *= -z;
+//	
+//			previous.setReal( plus1 );
+			
+			previous.setReal( padOperation( srcAccess, dimension, previous.getRealDouble(), z, Ci[ pole_idx ] ));
 
-			plus1 -= plus2;
-			plus1 *= -z;
-	
-			previous.setReal( plus1 );
+			System.out.println( " value after pad " + previous );
+			System.out.println( " dest pos after pad: " + Util.printCoordinates( destAccess ));
 
-			// anti-causal recursion over coefficients
-			// initialize
-//			initializeAntiCausalCoefficients( z, Ci[pole_idx], previous, destAccess );
-	
 			/*
 			 * After calling this method:
 			 *   destAccess at position N-2
 			 *   previous holds the value of coef at N-1
 			 */
-
+			debugPos = 227;
 			for( long i = N-1; i >= 0; i-- )
 			{
 				// coefs[ i ] = Z1 * ( coefs[i+1] - coefs[ i ]);
@@ -481,12 +417,66 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				coef.sub( previous );
 				coef.mul( -z );
 
+				if( destAccess.getIntPosition(0) == debugPos || debug )
+				{
+					System.out.println( "rev coef at " + destAccess.getIntPosition(0) + " : " + coef );
+					debug = true;
+				}
+
 				previous.set( coef );
 
 				srcAccess.bck( dimension );
 				destAccess.bck( dimension );
+
 			}
 		}
+	}
+	
+	private < R extends RealType<R>> double padOperation( RandomAccess< R > access, int dimension, double last, double z, double Ci )
+	{
+		boolean debug = true;
+
+		access.fwd( dimension );	
+		padding[ 0 ] = last + z * access.get().getRealDouble();
+
+		if( access.getIntPosition(0) == debugPos || debug )
+		{
+			System.out.println( "fwd coef at " + access.getIntPosition(0) + " : " + padding[ 0 ] );
+		}
+
+		// do paddingWidth more causal operations
+		for( int i = 1; i < paddingWidth; i++ )
+		{
+			access.fwd( dimension );	
+			padding[ i ] = padding[ i - 1 ] + z * access.get().getRealDouble();
+
+			if( access.getIntPosition(0) == debugPos || debug )
+			{
+				System.out.println( "fwd coef at " + access.getIntPosition(0) + " : " + padding[ 1 ] );
+			}
+		}
+		
+		// initialize anticausal
+		padding [ paddingWidth - 1 ] += z * padding [ paddingWidth - 2 ];
+		padding [ paddingWidth - 1 ] *= Ci;
+
+		if( debug )
+		{
+			System.out.println( "padded rev init: " +  padding[ paddingWidth - 1 ] );
+		}
+		
+		// do paddingWith anticausal operations
+		for( int i = paddingWidth - 2; i >=0; i-- )
+		{
+			padding[ i ] = z * ( padding[ i + 1] - padding[ i ] );
+			if( debug )
+			{
+				System.out.println( "padded rev coef at " + padding[ i ] );
+				debug = true;
+			}
+		}
+
+		return padding[ 0 ];
 	}
 
 	/*
@@ -534,13 +524,13 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		// TODO this method is wasteful if the interval is zero-extended.
 		// Need this when working block-wise though
 		
-		int horizon;
-		if( tolerance > 0.0 )
-		{
-			horizon = (int)(Math.ceil( Math.log( tolerance )  / Math.log( Math.abs( z ))));
-		}
-		else
-			horizon = 6;
+		int horizon = 6;
+//		if( tolerance > 0.0 )
+//		{
+//			horizon = (int)(Math.ceil( Math.log( tolerance )  / Math.log( Math.abs( z ))));
+//		}
+//		else
+//			horizon = 6;
 		
 		/*
 		 * Note:
