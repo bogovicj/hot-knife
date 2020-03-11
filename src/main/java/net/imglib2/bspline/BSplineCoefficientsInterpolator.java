@@ -34,7 +34,6 @@
 
 package net.imglib2.bspline;
 
-import java.util.Arrays;
 
 import net.imglib2.Cursor;
 import net.imglib2.Localizable;
@@ -44,10 +43,11 @@ import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.RealInterval;
 import net.imglib2.RealRandomAccess;
 import net.imglib2.interpolation.InterpolatorFactory;
-import net.imglib2.position.transform.FloorOffset;
+import net.imglib2.neighborhood.Neighborhood;
+import net.imglib2.neighborhood.RectangleShape;
+import net.imglib2.position.transform.Floor;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
-import net.imglib2.util.Util;
 import net.imglib2.view.Views;
 
 
@@ -57,7 +57,7 @@ import net.imglib2.view.Views;
  * @author John Bogovic
  * @author Stephan Saalfeld
  */
-public class BSplineCoefficientsInterpolator extends FloorOffset< RandomAccess< DoubleType > > implements RealRandomAccess< DoubleType >, InterpolatorFactory< DoubleType, RandomAccessibleInterval<DoubleType> >, Localizable
+public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighborhood< DoubleType >>> implements RealRandomAccess< DoubleType >, InterpolatorFactory< DoubleType, RandomAccessibleInterval<DoubleType> >, Localizable
 {
 	public static final double SQRT3 = Math.sqrt ( 3.0 );
 	
@@ -65,172 +65,122 @@ public class BSplineCoefficientsInterpolator extends FloorOffset< RandomAccess< 
 	public static final double Z1 = SQRT3 - 2;
 
 	public static final double Ci = -Z1 / ( 1 - (Z1*Z1));
-
-	final protected RandomAccessible<DoubleType> coefficients;
-
-	final protected DoubleType accumulator;
-
-	final protected DoubleType tmp;
-
-	final protected DoubleType w;
 	
+	public static final double ONESIXTH = 1.0 / 6.0;
+	public static final double TWOTHIRDS = 2.0 / 3.0;
+	public static final double FOURTHIRDS = 4.0 / 3.0;
+
 	final protected DoubleType value;
 	
-	final public double[][] weights; // TODO make protected
+	final protected double[][] weights;
 	
 	final protected int bsplineOrder;
 
 	final protected int kernelWidth;
-
-	final protected long[] coefMin;
-
-	final protected long[] coefMax;
-
-	final protected int[] ZERO;
 	
-//	final protected int[] coefDimOffsets;
+	protected final RectangleShape shape;
 	
 	boolean DEBUG = false;
 	
-	final static private int kernelWidth( final int order )
-	{
-		return (order + 1);
-	}
 
-	final static private long[] createOffset( final int order, final int n )
+	/**
+	 * This is unfortunately necessary because rectangles always have an extents
+	 * equal to an odd number of pixels.  Need to round up to the nearest odd number
+	 * when an even number of samples are needed.
+	 * 
+	 * This will be wasteful in general.   We should move away from using RectangleShapes here soon.
+	 * 
+	 * @return an appropriate rectangle 
+	 */
+	public static RectangleShape shapeFromOrder( int bsplineOrder )
 	{
-		final int r = ( kernelWidth( order ) - 1 ) / 2;
-		final long[] offset = new long[ n ];
-		Arrays.fill( offset, -r );
-		return offset;
-	}
+		assert( bsplineOrder <= 5  && bsplineOrder >= 0 );
 
-//	public static int[] createCoefLoopOffsets( int[] weightDim, long[] coefDims )
-//	{
-//		int nd = coefDims.length;
-//		int[] coefDimOffsets = new int[ nd ];
-//		coefDimOffsets[ 0 ] = 1;
-//
-//		// compute the total number of weights and 
-//		int Nweights = 1;
-//		for ( int d = 1; d < nd; ++d )
-//		{
-//			Nweights *= weightDim[ d ];
-//			coefDimOffsets[ d ] = (int)coefDims[ d ];
-//		}
-//		
-//		int[] offset = new int[ Nweights ];
-//		int[] pos = new int[ nd ];
-//		for( int i = 0; i < Nweights; i++ )
-//		{
-//			for ( int d = nd-1; d <= 0; d-- )
-//			{
-//				if( i % weightDim[ d ] == 0 )
-//				{
-//					
-//				}
-//			}
-//			
-//		}
-//
-//		return offset;
-//	}
+		switch ( bsplineOrder ){
+			case 0:
+				return new RectangleShape( 0, false ); // need one sample - correct
+			case 1:
+				return new RectangleShape( 1, false ); // need two samples - round up
+			case 2: 
+				return new RectangleShape( 1, false ); // need three samples - correct
+			case 3:
+				return new RectangleShape( 2, false ); // need four samples - round up
+			case 4:
+				return new RectangleShape( 2, false ); // need five samples - round up
+			case 5:
+				return new RectangleShape( 3, false ); // need six samples - round up
+			default:
+				return null;
+		}
+	}
 
 	public BSplineCoefficientsInterpolator( final BSplineCoefficientsInterpolator interpolator, final int order )
 	{
-		super( interpolator.target.copyRandomAccess(), createOffset( order, interpolator.numDimensions() ) );
+		super( interpolator.target.copyRandomAccess() );
 
-		this.bsplineOrder = order;
-		kernelWidth = kernelWidth( order );
+		this.bsplineOrder = interpolator.bsplineOrder;
+		this.shape = shapeFromOrder( bsplineOrder );
 
-		value = interpolator.target.get().createVariable();
-		accumulator = new DoubleType();
-		tmp = new DoubleType();
-		w = new DoubleType();
+		value = new DoubleType();
 
-		coefficients= interpolator.coefficients;
-
-//		coefDimOffsets = null;
-		coefMin = new long[ numDimensions() ];
-		coefMax = new long[ numDimensions() ];
-		for ( int d = 0; d < n; ++d )
-		{
-			position[ d ] = interpolator.position[ d ];
-			discrete[ d ] = interpolator.discrete[ d ];
-		}
+		// this should change when we stop using rectangleshapes
+		kernelWidth = 2 * shape.getSpan() + 1;
 
 		weights = new double[ numDimensions() ][ kernelWidth ];
-		ZERO = new int[ numDimensions() ];
 	}
 
 	public BSplineCoefficientsInterpolator( final RandomAccessible< DoubleType > coefficients, final int order )
 	{
-		super( coefficients.randomAccess(), createOffset( order, coefficients.numDimensions() ) );
+		this( coefficients, order, shapeFromOrder( order ));
+	}
 
+	private BSplineCoefficientsInterpolator( final RandomAccessible< DoubleType > coefficients, final int order, final RectangleShape shape )
+	{
+		super( shape.neighborhoodsRandomAccessible( coefficients ).randomAccess() );
+
+		this.shape = shape;
 		this.bsplineOrder = order;
-		kernelWidth = kernelWidth( order );
 
 		value = new DoubleType();
-		accumulator = new DoubleType();
-		tmp = new DoubleType();
-		w = new DoubleType();
-		
-		this.coefficients = coefficients;
 
-		coefMin = new long[ numDimensions() ];
-		coefMax = new long[ numDimensions() ];
-
-//		coefDimOffsets = new int[ numDimensions() ];
-//		coefDimOffsets[ 0 ] = 1;
-//		for ( int d = 1; d < n; ++d )
-//		{
-//			coefDimOffsets[ d ] = (int)coefInterval.dimension( d - 1 );
-//		}
+		// this should change when we stop using rectangleshapes
+		kernelWidth = 2 * shape.getSpan() + 1;
 
 		weights = new double[ numDimensions() ][ kernelWidth ];
-		ZERO = new int[ numDimensions() ];
 	}
 
-	public RandomAccessible< DoubleType > coefficients()
-	{
-		return coefficients;
-	}
-	
-	public void printPosition()
-	{
-		System.out.println( "interp position : " + Arrays.toString( position ));
-		System.out.println( "target position : " + Util.printCoordinates( target ));
-	}
-	
 	@Override
 	public DoubleType get()
 	{
 		fillWeights();
-		fillWindow();
-		accumulator.setZero();
-		
-		Cursor<DoubleType> c = Views.zeroMin( 
-				Views.interval( 
-						coefficients,
-						coefMin, coefMax )
-				).cursor();
 
-		while( c.hasNext() )
+		double accumulator = 0;
+		final Cursor< DoubleType > c = target.get().cursor();
+		while ( c.hasNext() )
 		{
-			tmp.setReal( c.next().getRealDouble() );
-			for( int d = 0; d < numDimensions(); d++ )
+			double tmp = c.next().getRealDouble();
+			for ( int d = 0; d < numDimensions(); d++ )
 			{
-//				double ww = weights[ d ][ c.getIntPosition( d ) ];
-//				System.out.println( "ci : " + c.getIntPosition( d ) );
-//				System.out.println( "w  : " +  ww );
+				final int index = ( int ) ( c.getLongPosition( d ) - target.getLongPosition( d ) + shape.getSpan() );
 
-				tmp.mul( weights[ d ][ c.getIntPosition( d ) ]);
+				// debug
+				if( index >=  weights[d].length )
+				{
+					System.out.println( "cpos: " + c.getLongPosition( d ) );
+					System.out.println( "tpos: " + target.getLongPosition( d ) );
+					System.out.println( "span: " + shape.getSpan());
+				}
+
+//				tmp *= weights[ d ][ index ];
+
+				// This check seems necessary after using too-big rectangle shape
+				if( index <  weights[d].length )
+					tmp *= weights[ d ][ index ];
 			}
-			//System.out.println( "tmp: " + tmp );
-			accumulator.add( tmp );
+			accumulator += tmp;
 		}
 
-		value.setReal( accumulator.getRealDouble() );
+		value.setReal( accumulator );
 		return value;
 	}
 	
@@ -240,32 +190,17 @@ public class BSplineCoefficientsInterpolator extends FloorOffset< RandomAccess< 
 		return (long)Math.floor( position[ d ]);
 	}
 
-	public void fillWindow() // TODO make protected
+	// TODO generalize for any order spline
+	protected void fillWeights()
 	{
-		for( int d = 0; d < numDimensions(); d++ )
+		final Neighborhood< DoubleType > rect = target.get();
+		for ( int d = 0; d < numDimensions(); d++ )
 		{
-			coefMin[ d ] = (long)Math.floor( position[ d ] ) + offset[ d ]; 
-			coefMax[ d ] = coefMin[ d ] + kernelWidth - 1;
-		}
-	}
-
-	public void fillWeights() // TODO make protected
-	{
-		double j = 0;
-		for( int d = 0; d < numDimensions(); d++ )
-		{
-			// j is a double that will take integer values
-			// starts at the smallest integer value in the support 
-			// of the b-spline kernel
-			j = Math.floor( position[ d ] ) + offset[ d ]; 
-			for( int i = 0; i < kernelWidth; i++ )
-			{
-//				double dist = position[ d ] - j;
-//				System.out.println( "dist: " + dist );
-//				System.out.println( "j   : " + j );
-				weights[ d ][ i ] = evaluate3( position[ d ] - j );
-				j++;
-			}
+			final double pos = position[ d ];
+			final long min = rect.min( d );
+			final long max = rect.max( d );
+			for ( long i = min; i <= max; ++i )
+				weights[ d ][ ( int ) ( i - min ) ] = evaluate3( pos - i );
 		}
 	} 
 
@@ -303,26 +238,45 @@ public class BSplineCoefficientsInterpolator extends FloorOffset< RandomAccess< 
 			return 0.0;
 	}
 
+	/*
+	 * Third order spline kernel
+	 */
+	public static double evaluate3Normalized( final double u )
+	{
+		final double absValue = Math.abs( u );
+		final double sqrValue = u * u;
+		if ( absValue <= 1.0 )
+			return ( TWOTHIRDS - sqrValue + 0.5 * sqrValue * absValue );
+		else if ( absValue < 2.0 )
+		{
+			final double twoMinusAbsValue = 2 - absValue;
+			return twoMinusAbsValue * twoMinusAbsValue * twoMinusAbsValue * ONESIXTH;
+		}
+		else
+			return 0.0;
+	}
+
 	@Override
-	public BSplineCoefficientsInterpolator copy() {
+	public BSplineCoefficientsInterpolator copy()
+	{
 		return new BSplineCoefficientsInterpolator( this, this.bsplineOrder );
 	}
 
 	@Override
-	public RealRandomAccess<DoubleType> create(RandomAccessibleInterval<DoubleType> f) {
-		// TODO do something better?
+	public RealRandomAccess<DoubleType> create(RandomAccessibleInterval<DoubleType> f)
+	{
 		return copy();
 	}
 
 	@Override
-	public RealRandomAccess<DoubleType> create(RandomAccessibleInterval<DoubleType> f, RealInterval interval) {
-		// TODO do something better?
+	public RealRandomAccess<DoubleType> create(RandomAccessibleInterval<DoubleType> f, RealInterval interval)
+	{
 		return copy();
 	}
 
 	@Override
-	public RealRandomAccess<DoubleType> copyRealRandomAccess() {
-		// TODO do something better?
+	public RealRandomAccess<DoubleType> copyRealRandomAccess()
+	{
 		return copy();
 	}
 
