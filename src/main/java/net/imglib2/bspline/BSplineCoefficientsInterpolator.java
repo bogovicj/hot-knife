@@ -163,13 +163,13 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 			{
 				final int index = ( int ) ( c.getLongPosition( d ) - target.getLongPosition( d ) + shape.getSpan() );
 
-				// debug
-				if( index >=  weights[d].length )
-				{
-					System.out.println( "cpos: " + c.getLongPosition( d ) );
-					System.out.println( "tpos: " + target.getLongPosition( d ) );
-					System.out.println( "span: " + shape.getSpan());
-				}
+//				// debug
+//				if( index >=  weights[d].length )
+//				{
+//					System.out.println( "cpos: " + c.getLongPosition( d ) );
+//					System.out.println( "tpos: " + target.getLongPosition( d ) );
+//					System.out.println( "span: " + shape.getSpan());
+//				}
 
 //				tmp *= weights[ d ][ index ];
 
