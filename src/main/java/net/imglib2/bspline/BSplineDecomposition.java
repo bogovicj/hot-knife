@@ -11,11 +11,14 @@ import net.imglib2.Point;
 import net.imglib2.RandomAccess;
 import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
+import net.imglib2.img.Img;
 import net.imglib2.iterator.IntervalIterator;
+import net.imglib2.loops.LoopBuilder;
 import net.imglib2.transform.integer.MixedTransform;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.util.Intervals;
 import net.imglib2.util.Util;
+import net.imglib2.view.IntervalView;
 import net.imglib2.view.MixedTransformView;
 import net.imglib2.view.Views;
 
@@ -31,18 +34,25 @@ import net.imglib2.view.Views;
 public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> implements Consumer< RandomAccessibleInterval<S>>
 {
 	protected final int order;
-	
+
 	protected final int numberOfPoles;
+
 	protected final double[] poles;
+
+	// precompute z_i / ( z_i * z_i - 1 )
 	protected final double[] Ci;
 
-	protected final RandomAccessible<T> img;
+	protected final RandomAccessible< T > img;
 
 	protected double tolerance = 1e-6;
 
-	protected int paddingWidth = 7;
+	protected int paddingWidth = 10;
+
+	protected int initHorizon = 6;
 	
 	protected double[] padding;
+
+	protected RandomAccessibleInterval< S > tmpCoefStorage;
 
 	public BSplineDecomposition( final int order, final RandomAccessible<T> img )
 	{
@@ -61,7 +71,6 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	/**
 	 * This constructor will build a cubic bspline decomposition.
 	 */
-	@SuppressWarnings("unchecked")
 	public BSplineDecomposition( final RandomAccessible<T> img )
 	{
 		this( 3, img );
@@ -69,11 +78,36 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 
 	public static double[] polesCi( double[] poles )
 	{
+		// TODO doc, source, and cite this 
 		double[] Ci = new double[ poles.length ];
 		for( int i = 0; i < poles.length; i++ )
-			Ci[ i ]= poles[ 0 ] / ( poles[0] * poles[0] - 1.0 );
-	
+			Ci[ i ]= poles[ i ] / ( poles[ i ] * poles[ i ] - 1.0 );
+
 		return Ci;
+	}
+
+	@Override
+	public void accept( final RandomAccessibleInterval< S > coefficients )
+	{
+		/*
+		 * Uncomment the below to re-use a single temporary image.
+		 * This breaks Lazy.process
+		 */
+//		FinalInterval itvl = Intervals.expand( coefficients, 6 );
+//		if( tmpCoefStorage == null )
+//		{
+//			tmpCoefStorage = Util.getSuitableImgFactory( itvl, Util.getTypeFromInterval( coefficients )).create( itvl );
+//		}
+//		IntervalView<S> paddedImg = Views.translate( tmpCoefStorage, Intervals.minAsLongArray(itvl));
+
+		FinalInterval itvl = Intervals.expand( coefficients, 3 );
+		Img<S> paddedImgZero = Util.getSuitableImgFactory( itvl, Util.getTypeFromInterval( coefficients )).create( itvl );
+		IntervalView<S> paddedImg = Views.translate( paddedImgZero, Intervals.minAsLongArray(itvl));
+
+		acceptUnpadded( paddedImg );
+
+		IntervalView<S> subImg = Views.interval( paddedImg, coefficients );
+		LoopBuilder.setImages( subImg, coefficients ).forEachPixel( (x,y) -> y.set(x) );
 	}
 
 	// for debug purposes, keep track of how many times accept method is called
@@ -85,11 +119,10 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	 * @param coefficients the interval and destination in which to store coefficients.
 	 */
 	@SuppressWarnings("unchecked")
-	@Override
-	public void accept( final RandomAccessibleInterval< S > coefficients )
+	public void acceptUnpadded( final RandomAccessibleInterval< S > coefficients )
 	{
-
 		acceptCount++;
+
 //		System.out.println(" computing coefficients " + acceptCount);
 //		System.out.println(" input itvl: " + Util.printInterval(coefficients));
 //		long startTime = System.currentTimeMillis();
@@ -126,75 +159,12 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				dataAccess.setPosition( it );
 	
 				recursion1d( dataAccess, coefAccess, var,
-							coefficients.dimension( d ), d,
-							tolerance, numberOfPoles, poles, Ci );
+							coefficients.dimension( d ), d );
 			}
 		}
 
 //		long endTime = System.currentTimeMillis();
 //		System.out.println( "took " + (endTime - startTime) +" ms" );
-	}
-
-	public static <S extends RealType<S>> RandomAccessible<S> get1d(
-			final RandomAccessible<S> whole,
-			final int dim,
-			final Localizable position )
-	{
-		MixedTransform t = to1dRow( whole.numDimensions(), dim, position );
-		MixedTransformView<S> subset = new MixedTransformView<>( whole, t );
-		return subset;
-	}
-	
-	public static <S extends RealType<S>> RandomAccessibleInterval<S> get1dSubset(
-			final RandomAccessibleInterval<S> whole,
-			final int dim,
-			final Localizable position )
-	{
-		MixedTransform t = to1dRow( whole.numDimensions(), dim, position );
-		MixedTransformView<S> subset = new MixedTransformView<>( whole, t );
-		return Views.interval( subset, new FinalInterval( whole.dimension( dim ) ));
-	}
-
-	/**
-	 * Returns the transformation that is used  above
-	 * <p>
-	 * Warning: The transformations used in {@link Views} are always
-	 * inverse to the operations that are performed by the views.
-	 * <p>
-	 *
-	 * @param numDimensions Number of dimensions including that dimension
-	 *                      that is sliced / inserted.
-	 * @param d             Index of that dimension that is kept
-	 * @param pos           Position of the slice / value of the coordinate that's
-	 *                      inserted.
-	 * @return Transformation that inserts a coordinate at the given index.
-	 */
-	public static MixedTransform to1dRow( final int numDimensions, final int d, final Localizable pos )
-	{
-		final MixedTransform t = new MixedTransform( 1, numDimensions );
-		final long[] translation = new long[ numDimensions ];
-		final boolean[] zero = new boolean[ numDimensions ];
-		final int[] component = new int[ numDimensions ];
-
-		for ( int i = 0; i < numDimensions; ++i )
-		{
-			if( i == d )
-			{
-				zero[ i ] = false;
-				component[ i ] = 0;
-				translation[ i ] = 0;
-			}
-			else
-			{
-				translation[ i ] = pos.getIntPosition( i );
-				zero[ i ] = true;
-			}
-		}
-
-		t.setTranslation( translation );
-		t.setComponentZero( zero );
-		t.setComponentMapping( component );
-		return t;
 	}
 
 	public static IntervalIterator getIterator( Interval interval, int dim )
@@ -319,21 +289,13 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	 * @param previous a temporary variable
 	 * @param N width of the recursion
 	 * @param dimension the dimension along which to operate
-	 * @param tolerance tolerance for initializing coefficients
-	 * @param numberOfPoles number of poles
-	 * @param poles the poles
-	 * @param Ci Ci
 	 */
 	public <S extends RealType<S>, T extends RealType<T>> void recursion1d(
 			final RandomAccess<T> srcAccess,
 			final RandomAccess<S> destAccess,
 			final S previous,
 			final long N, 
-			final int dimension,
-			final double tolerance,
-			final int numberOfPoles,
-			final double[] poles,
-			final double[] Ci )
+			final int dimension )
 	{
 		boolean debug = false;
 		for( int pole_idx = 0; pole_idx < numberOfPoles; pole_idx++ )
@@ -360,15 +322,17 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				
 				previous.set( coef );
 				
-				if( destAccess.getIntPosition(0) == debugPos || debug )
-				{
-					System.out.println( "fwd coef at " + destAccess.getIntPosition(0) + " : " + coef );
+//				if( destAccess.getIntPosition(0) == debugPos || debug )
+//				{
+//					System.out.println( "fwd coef at " + destAccess.getIntPosition(0) + " : " + coef );
+//					System.out.println( "fwd img value at " + srcAccess.getIntPosition(0) + " : " + srcAccess.get() );
 //					debug = true;
-				}
+//				}
 			}
 			// here, destAccess at position N-1
 			
-			System.out.println( " dest pos after fwd : " + Util.printCoordinates( destAccess ));
+//			System.out.println( " after fwd, prev val : " + previous );
+//			System.out.println( " dest pos after fwd : " + Util.printCoordinates( destAccess ));
 			
 //			// go a little further
 //			// N 
@@ -400,8 +364,8 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 			
 			previous.setReal( padOperation( srcAccess, dimension, previous.getRealDouble(), z, Ci[ pole_idx ] ));
 
-			System.out.println( " value after pad " + previous );
-			System.out.println( " dest pos after pad: " + Util.printCoordinates( destAccess ));
+//			System.out.println( " value after pad " + previous );
+//			System.out.println( " dest pos after pad: " + Util.printCoordinates( destAccess ));
 
 			/*
 			 * After calling this method:
@@ -417,11 +381,11 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				coef.sub( previous );
 				coef.mul( -z );
 
-				if( destAccess.getIntPosition(0) == debugPos || debug )
-				{
-					System.out.println( "rev coef at " + destAccess.getIntPosition(0) + " : " + coef );
-					debug = true;
-				}
+//				if( destAccess.getIntPosition(0) == debugPos || debug )
+//				{
+//					System.out.println( "rev coef at " + destAccess.getIntPosition(0) + " : " + coef );
+//					debug = true;
+//				}
 
 				previous.set( coef );
 
@@ -431,50 +395,71 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 			}
 		}
 	}
-	
+
 	private < R extends RealType<R>> double padOperation( RandomAccess< R > access, int dimension, double last, double z, double Ci )
 	{
-		boolean debug = true;
+//		boolean debug = true;
+
+		// store initial position
+//		long accessPos = access.getLongPosition( dimension );
+
+//		System.out.println("pad init: " + last);
 
 		access.fwd( dimension );	
-		padding[ 0 ] = last + z * access.get().getRealDouble();
+//		System.out.println("pad access: " + access.get());
+		padding[ 0 ] = access.get().getRealDouble() + z * last;
 
-		if( access.getIntPosition(0) == debugPos || debug )
-		{
-			System.out.println( "fwd coef at " + access.getIntPosition(0) + " : " + padding[ 0 ] );
-		}
+//		if( access.getIntPosition(0) == debugPos || debug )
+//		{
+//			System.out.println( "pad fwd coef at " + access.getIntPosition(0) + " : " + padding[ 0 ] );
+//		}
 
 		// do paddingWidth more causal operations
 		for( int i = 1; i < paddingWidth; i++ )
 		{
 			access.fwd( dimension );	
-			padding[ i ] = padding[ i - 1 ] + z * access.get().getRealDouble();
+			padding[ i ] = access.get().getRealDouble() + z * padding[ i - 1 ];
 
-			if( access.getIntPosition(0) == debugPos || debug )
-			{
-				System.out.println( "fwd coef at " + access.getIntPosition(0) + " : " + padding[ 1 ] );
-			}
+//			if( access.getIntPosition(0) == debugPos || debug )
+//			{
+//				System.out.println( "pad fwd coef at " + access.getIntPosition(0) + " : " + padding[ i ] );
+//			}
 		}
 		
 		// initialize anticausal
+		// coefs[ N-1 ] = Ci * ( coefs[ N-1 ] + z * coefs[ N-2 ] );
+
+
+		/*
+		 * IS IT THE CASE THAT THIS INITIALIZATION IMPOSES A ZERO FIRST DERIVATIVE AT THE BOUNDARY?
+		 * IF SO, THIS IS THE CAUSE OF THE ISSUE
+		 */
 		padding [ paddingWidth - 1 ] += z * padding [ paddingWidth - 2 ];
 		padding [ paddingWidth - 1 ] *= Ci;
 
-		if( debug )
-		{
-			System.out.println( "padded rev init: " +  padding[ paddingWidth - 1 ] );
-		}
+		// debug
+		//padding [ paddingWidth - 1 ] = 0.15365877469604136;
+
+//		if( debug )
+//		{
+//			System.out.println( "pad rev init: " +  padding[ paddingWidth - 1 ] );
+//		}
 		
 		// do paddingWith anticausal operations
+		int j = 1;
 		for( int i = paddingWidth - 2; i >=0; i-- )
 		{
-			padding[ i ] = z * ( padding[ i + 1] - padding[ i ] );
-			if( debug )
-			{
-				System.out.println( "padded rev coef at " + padding[ i ] );
-				debug = true;
-			}
+			padding[ i ] = z * ( padding[ i + 1 ] - padding[ i ] );
+//			if( debug )
+//			{
+//				System.out.println( "pad rev coef at " + (access.getIntPosition(0) - j ) + " : "+ padding[ i ] );
+//				j++;
+//				debug = true;
+//			}
 		}
+
+		// reset position
+//		access.setPosition( accessPos, dimension );
 
 		return padding[ 0 ];
 	}
@@ -487,13 +472,12 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	 *   calls coefs.bck( 0 )
 	 *   changes the value of previous
 	 */
-	public static <T extends RealType<T>> void initializeAntiCausalCoefficients(
+	protected static <T extends RealType<T>> void initializeAntiCausalCoefficients(
 			final double z,
 			final double c,
 			final T previous, // temporary variable
 			final RandomAccess<T> coefs )
 	{
-		// TODO make this method protected
 		T last = coefs.get(); // last has the value at coefs[ N-1 ]
 
 		coefs.bck( 0 );
@@ -513,14 +497,12 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	 * 
 	 * See Box 2 of Unser 1999
 	 */
-	public static <T extends RealType<T>> double initializeCausalCoefficients(
+	protected static <T extends RealType<T>> double initializeCausalCoefficients(
 			final double z,
 			final double tolerance,
 			final int dimension,
 			final RandomAccess<T> dataAccess )
 	{
-		// TODO make this method protected / private
-
 		// TODO this method is wasteful if the interval is zero-extended.
 		// Need this when working block-wise though
 		
@@ -571,6 +553,7 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	}
 
 	/**
+	 * Returns the poles for the filter for a spline of a given order. 
 	 * See Unser, 1997. Part II, Table I for Pole values.
 	 * 
 	 * @param splineOrder the order of the bspline
@@ -581,9 +564,9 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		switch( splineOrder )
 		{
 		case 0:
-			return new double[ 0 ];
+			return new double[ 0 ]; // empty
 		case 1:
-			return new double[ 0 ];
+			return new double[ 0 ]; // empty
 		case 2:
 			return new double[]{ Math.sqrt( 8.0 ) - 3.0 };
 		case 3:
@@ -601,37 +584,5 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		default:
 			return null;
 		}
-	}
-
-	public <S extends RealType<S>> void printCoefs( final RandomAccessibleInterval<S> coefs )
-	{
-		System.out.println( "coefs: ");
-		Cursor<S> c = Views.iterable( coefs ).cursor();
-		while( c.hasNext() )
-		{
-			S v = c.next();
-			String prefix = "  ";
-			System.out.print( prefix + v );
-		}
-		System.out.print( "\n\n");
-	}
-
-	public <S extends RealType<S>> void printCoefs2d( final RandomAccessibleInterval<S> coefs )
-	{
-		System.out.println( "\ncoefs: ");
-		Cursor<S> c = Views.iterable( coefs ).cursor();
-		int yp = -1;
-		while( c.hasNext() )
-		{
-			S v = c.next();
-			String prefix = "  ";
-			if( yp != -1 && c.getIntPosition( 1 ) != yp )
-				prefix = "\n  ";
-
-			yp = c.getIntPosition( 1 );
-			System.out.print( prefix + v );
-
-		}
-		System.out.print( "\n");
 	}
 }
