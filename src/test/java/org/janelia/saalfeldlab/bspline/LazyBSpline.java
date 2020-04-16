@@ -65,21 +65,36 @@ public class LazyBSpline {
 
 		new ImageJ();
 
-		RandomAccessibleInterval<DoubleType> img = brainImg();
+		RandomAccessibleInterval<DoubleType> img = flyImg();
+//		RandomAccessibleInterval<DoubleType> img = humanImg();
 //		RandomAccessibleInterval<DoubleType> img = impulseImg( new long[]{ 100, 100 }, new long[]{ 5, 5 });
 //		RandomAccessibleInterval<DoubleType> img = impulseImg( new long[]{ 100, 100 }, new long[]{ 9, 9 });
 		
 		runVisTest( img, blockSizeSmall, true );
 		
-		ArrayList<double[]> pts = new ArrayList<>();
-		pts.add( new double[]{ 9.5, 9.5 } );
-	
+//		ArrayList<double[]> pts = new ArrayList<>();
+//		pts.add( new double[]{ 9.5, 9.5 } );
 //		runPtTest( img, blockSizeSmall, pts );
 
 //		runPadTest( img, blockSizeSmall );
 	}
 
-	public static RandomAccessibleInterval<DoubleType> brainImg()
+	public static RandomAccessibleInterval<DoubleType> flyImg()
+	{
+		final ImagePlus imp = IJ.openImage( "/Users/bogovicj/Documents/projects/jrc2018/jrc18_demo_sample_data/JRC2018_FEMALE_small.tif" );
+		System.out.println( "imp: " + imp );
+		imp.show();
+
+		final RandomAccessibleInterval<? extends RealType<?>> img = (RandomAccessibleInterval<? extends RealType<?>>) ImagePlusImgs.from(imp);
+		final RandomAccessibleInterval<DoubleType> imgDouble =
+				Converters.convert(
+						img,
+						(a, b) -> { b.set(a.getRealDouble()); },
+						new DoubleType());
+		return imgDouble;
+	}
+
+	public static RandomAccessibleInterval<DoubleType> humanImg()
 	{
 		final ImagePlus imp = IJ.openImage( "/home/john/tmp/t1-head.tif" );
 		imp.show();

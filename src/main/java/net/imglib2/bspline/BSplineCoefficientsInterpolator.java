@@ -280,5 +280,4 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 		return copy();
 	}
 
-
 }
