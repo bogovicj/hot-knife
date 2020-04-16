@@ -38,6 +38,8 @@ import net.imglib2.img.array.ArrayRandomAccess;
 import net.imglib2.img.basictypeaccess.AccessFlags;
 import net.imglib2.img.basictypeaccess.array.DoubleArray;
 import net.imglib2.img.imageplus.ImagePlusImgs;
+import net.imglib2.interpolation.randomaccess.BSplineInterpolator;
+import net.imglib2.interpolation.randomaccess.BSplineInterpolatorFactory;
 import net.imglib2.realtransform.AffineTransform3D;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.integer.UnsignedByteType;
@@ -244,6 +246,9 @@ public class LazyBSpline {
 
 		BSplineCoefficientsInterpolator coefsImg = new BSplineCoefficientsInterpolator( Views.extendZero( coefStorage ), 3 );
 		RealRandomAccessible<DoubleType> interpImg = Views.interpolate( imgDouble, coefsImg );
+		
+		BSplineInterpolatorFactory<DoubleType> onTheFlyFactory = new BSplineInterpolatorFactory<DoubleType>();
+		RealRandomAccessible<DoubleType> interpImgOnTheFly = Views.interpolate( ext, onTheFlyFactory );
 
 		// Lazy bspline coefficients Has artifacts
 		final BSplineDecomposition<DoubleType,DoubleType> coefsAlgForLazy = new BSplineDecomposition<DoubleType,DoubleType>( 3, ext );
@@ -282,6 +287,11 @@ public class LazyBSpline {
 		final BdvStackSource<DoubleType> imgRealLazy =
 				BdvFunctions.show( interpImgLazy, img,
 						"img interp lazy",
+						options.addTo( imgSrc ));
+
+		final BdvStackSource<DoubleType> imgOnThFly =
+				BdvFunctions.show( interpImgOnTheFly, img,
+						"img interp on the fly",
 						options.addTo( imgSrc ));
 	
 		if( showCoefs )
