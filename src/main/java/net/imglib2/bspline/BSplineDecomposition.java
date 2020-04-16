@@ -46,13 +46,15 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 
 	protected double tolerance = 1e-6;
 
-	protected int paddingWidth = 10;
+	protected int paddingWidth = 4;
 
 	protected int initHorizon = 6;
 	
 	protected double[] padding;
 
 	protected RandomAccessibleInterval< S > tmpCoefStorage;
+
+	protected Interval originalInterval;
 
 	public BSplineDecomposition( final int order, final RandomAccessible<T> img )
 	{
@@ -100,9 +102,15 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 //		}
 //		IntervalView<S> paddedImg = Views.translate( tmpCoefStorage, Intervals.minAsLongArray(itvl));
 
-		FinalInterval itvl = Intervals.expand( coefficients, 3 );
+
+		originalInterval = coefficients;
+
+		FinalInterval itvl = Intervals.expand( coefficients, paddingWidth );
 		Img<S> paddedImgZero = Util.getSuitableImgFactory( itvl, Util.getTypeFromInterval( coefficients )).create( itvl );
 		IntervalView<S> paddedImg = Views.translate( paddedImgZero, Intervals.minAsLongArray(itvl));
+
+//		System.out.println("orig itvl: " + Util.printInterval( coefficients ));
+//		System.out.println("padded itvl: " + Util.printInterval( paddedImg ));
 
 		acceptUnpadded( paddedImg );
 
@@ -151,7 +159,27 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				dataAccess = coefExtAccess;
 			}
 
+			/**
+			 * A "small" optimization:
+			 * 	Don't need to do recursion over padded areas for last dimensions
+			 *  since only the central, un-padded area will be copied into destination interval. 
+			 */
+
+			int start;
+			Interval itvl;
 			IntervalIterator it = getIterator( coefficients, d );
+			if( d == (nd - 1) && originalInterval != null )
+			{
+//				System.out.println("here");
+				itvl = originalInterval;
+				it = getIterator( coefficients, originalInterval, d );
+			}
+			else
+			{
+				itvl = coefficients;
+				it = getIterator( coefficients, d );
+			}
+
 			while( it.hasNext() )
 			{
 				it.fwd();
@@ -159,12 +187,38 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				dataAccess.setPosition( it );
 	
 				recursion1d( dataAccess, coefAccess, var,
-							coefficients.dimension( d ), d );
+							itvl.dimension( d ), d );
 			}
 		}
 
 //		long endTime = System.currentTimeMillis();
 //		System.out.println( "took " + (endTime - startTime) +" ms" );
+	}
+
+	public static IntervalIterator getIterator( 
+			final Interval paddedInterval,
+			final Interval originalInterval,
+			int dim )
+	{
+		int nd = paddedInterval.numDimensions();
+
+		long[] min = new long[ nd ];
+		long[] max = new long[ nd ];
+		for ( int d = 0; d < nd; d++ )
+		{
+			if( d == dim )
+			{
+				// min and max  the same here
+				min[ d ] = originalInterval.min( d );
+				max[ d ] = originalInterval.min( d );
+			}
+			else
+			{
+				min[ d ] = paddedInterval.min( d );
+				max[ d ] = paddedInterval.max( d );
+			}
+		}
+		return new IntervalIterator( min, max );
 	}
 
 	public static IntervalIterator getIterator( Interval interval, int dim )
