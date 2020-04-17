@@ -78,6 +78,8 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 
 	final protected int kernelWidth;
 	
+	final AbstractBsplineKernel kernel;
+
 	protected final RectangleShape shape;
 	
 	boolean DEBUG = false;
@@ -114,6 +116,28 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 		}
 	}
 
+	public static AbstractBsplineKernel makeKernel( int order )
+	{
+		assert( order <= 5  && order >= 0 );
+
+		switch ( order ){
+			case 0:
+				return new BsplineKernel0();
+			case 1:
+				return new BsplineKernel1();
+			case 2: 
+				return new BsplineKernel2();
+			case 3:
+				return new BsplineKernel3();
+			case 4:
+				return new BsplineKernel4();
+			case 5:
+				return null; // TODO
+			default:
+				return null;
+		}
+	}
+
 	public BSplineCoefficientsInterpolator( final BSplineCoefficientsInterpolator interpolator, final int order )
 	{
 		super( interpolator.target.copyRandomAccess() );
@@ -125,6 +149,7 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 
 		// this should change when we stop using rectangleshapes
 		kernelWidth = 2 * shape.getSpan() + 1;
+		kernel = makeKernel( order );
 
 		weights = new double[ numDimensions() ][ kernelWidth ];
 	}
@@ -145,6 +170,7 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 
 		// this should change when we stop using rectangleshapes
 		kernelWidth = 2 * shape.getSpan() + 1;
+		kernel = makeKernel( order );
 
 		weights = new double[ numDimensions() ][ kernelWidth ];
 	}
@@ -200,7 +226,7 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 			final long min = rect.min( d );
 			final long max = rect.max( d );
 			for ( long i = min; i <= max; ++i )
-				weights[ d ][ ( int ) ( i - min ) ] = evaluate3( pos - i );
+				weights[ d ][ ( int ) ( i - min ) ] = kernel.evaluateNorm( pos - i );
 		}
 	} 
 

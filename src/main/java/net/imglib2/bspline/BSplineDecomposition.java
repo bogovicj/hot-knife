@@ -49,12 +49,18 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	protected int paddingWidth = 4;
 
 	protected int initHorizon = 6;
-	
+
 	protected double[] padding;
 
 	protected RandomAccessibleInterval< S > tmpCoefStorage;
 
 	protected Interval originalInterval;
+
+	protected boolean isPadded = true;
+
+	protected boolean debug = false;
+
+	protected boolean doLastDimOptimization = true;
 
 	public BSplineDecomposition( final int order, final RandomAccessible<T> img )
 	{
@@ -78,6 +84,21 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		this( 3, img );
 	}
 
+	public void setPadded( final boolean isPadded )
+	{
+		this.isPadded = isPadded;
+	}
+
+	public void setDebug( final boolean debug )
+	{
+		this.debug = debug;
+	}
+
+	public void setDoOptimization( final boolean lastDimOpt )
+	{
+		this.doLastDimOptimization = lastDimOpt;
+	}
+
 	public static double[] polesCi( double[] poles )
 	{
 		// TODO doc, source, and cite this 
@@ -91,31 +112,28 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	@Override
 	public void accept( final RandomAccessibleInterval< S > coefficients )
 	{
-		/*
-		 * Uncomment the below to re-use a single temporary image.
-		 * This breaks Lazy.process
-		 */
-//		FinalInterval itvl = Intervals.expand( coefficients, 6 );
-//		if( tmpCoefStorage == null )
-//		{
-//			tmpCoefStorage = Util.getSuitableImgFactory( itvl, Util.getTypeFromInterval( coefficients )).create( itvl );
-//		}
-//		IntervalView<S> paddedImg = Views.translate( tmpCoefStorage, Intervals.minAsLongArray(itvl));
 
+		if( isPadded )
+		{
+			originalInterval = coefficients;
 
-		originalInterval = coefficients;
+			FinalInterval itvl = Intervals.expand( coefficients, paddingWidth );
+			Img<S> paddedImgZero = Util.getSuitableImgFactory( itvl, Util.getTypeFromInterval( coefficients )).create( itvl );
+			IntervalView<S> paddedImg = Views.translate( paddedImgZero, Intervals.minAsLongArray(itvl));
 
-		FinalInterval itvl = Intervals.expand( coefficients, paddingWidth );
-		Img<S> paddedImgZero = Util.getSuitableImgFactory( itvl, Util.getTypeFromInterval( coefficients )).create( itvl );
-		IntervalView<S> paddedImg = Views.translate( paddedImgZero, Intervals.minAsLongArray(itvl));
+//			System.out.println("orig itvl: " + Util.printInterval( coefficients ));
+//			System.out.println("padded itvl: " + Util.printInterval( paddedImg ));
 
-//		System.out.println("orig itvl: " + Util.printInterval( coefficients ));
-//		System.out.println("padded itvl: " + Util.printInterval( paddedImg ));
+			acceptUnpadded( paddedImg );
 
-		acceptUnpadded( paddedImg );
+			IntervalView<S> subImg = Views.interval( paddedImg, coefficients );
+			LoopBuilder.setImages( subImg, coefficients ).forEachPixel( (x,y) -> y.set(x) );
+		}
+		else
+		{
+			acceptUnpadded( coefficients );
+		}
 
-		IntervalView<S> subImg = Views.interval( paddedImg, coefficients );
-		LoopBuilder.setImages( subImg, coefficients ).forEachPixel( (x,y) -> y.set(x) );
 	}
 
 	// for debug purposes, keep track of how many times accept method is called
@@ -129,11 +147,13 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	@SuppressWarnings("unchecked")
 	public void acceptUnpadded( final RandomAccessibleInterval< S > coefficients )
 	{
-		acceptCount++;
-
+//		acceptCount++;
 //		System.out.println(" computing coefficients " + acceptCount);
 //		System.out.println(" input itvl: " + Util.printInterval(coefficients));
-//		long startTime = System.currentTimeMillis();
+
+		long startTime = 0; 
+		if( debug )
+			startTime = System.currentTimeMillis();
 
 		int nd = img.numDimensions();
 	
@@ -168,9 +188,9 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 			int start;
 			Interval itvl;
 			IntervalIterator it = getIterator( coefficients, d );
-			if( d == (nd - 1) && originalInterval != null )
+			if( doLastDimOptimization && d == (nd - 1) && originalInterval != null )
 			{
-//				System.out.println("here");
+				//System.out.println("opt");
 				itvl = originalInterval;
 				it = getIterator( coefficients, originalInterval, d );
 			}
@@ -191,8 +211,11 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 			}
 		}
 
-//		long endTime = System.currentTimeMillis();
-//		System.out.println( "took " + (endTime - startTime) +" ms" );
+		if( debug )
+		{
+			long endTime = System.currentTimeMillis();
+			System.out.println( "took " + (endTime - startTime) +" ms" );
+		}
 	}
 
 	public static IntervalIterator getIterator( 
@@ -609,6 +632,9 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	/**
 	 * Returns the poles for the filter for a spline of a given order. 
 	 * See Unser, 1997. Part II, Table I for Pole values.
+	 * 
+	 * From:
+	 * Modules/Core/ImageFunction/include/itkBSplineDecompositionImageFilter.hxx
 	 * 
 	 * @param splineOrder the order of the bspline
 	 * @return an array of the poles
