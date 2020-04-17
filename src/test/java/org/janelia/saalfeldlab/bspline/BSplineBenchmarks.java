@@ -51,6 +51,8 @@ public class BSplineBenchmarks {
 		long[] min = new long[ img.numDimensions() ];
 		int[] dim = new int[ img.numDimensions() ];
 
+		long total = 0;
+
 		long i = 0;
 		IntervalIterator it = new IntervalIterator( grid.getGridDimensions() );
 		while( it.hasNext())
@@ -59,10 +61,19 @@ public class BSplineBenchmarks {
 			grid.getCellDimensions( i, min, dim );
 
 			IntervalView<DoubleType> cellTranslated = Views.translate( cell, min );
+			long startTime = System.currentTimeMillis();
+
 			coefsAlg.accept( cellTranslated );
+
+			long endTime = System.currentTimeMillis();
+			System.out.println( " " + (endTime - startTime) +" ms" );
+
+			total += (endTime - startTime );
 
 			i++;
 		}
+
+		System.out.println( "total block processing time: " + total );
 	}
 	
 

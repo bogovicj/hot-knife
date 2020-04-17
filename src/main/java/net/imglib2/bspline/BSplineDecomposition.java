@@ -151,10 +151,6 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 //		System.out.println(" computing coefficients " + acceptCount);
 //		System.out.println(" input itvl: " + Util.printInterval(coefficients));
 
-		long startTime = 0; 
-		if( debug )
-			startTime = System.currentTimeMillis();
-
 		int nd = img.numDimensions();
 	
 		RandomAccess<T> imgAccess = img.randomAccess();
@@ -209,12 +205,6 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				recursion1d( dataAccess, coefAccess, var,
 							itvl.dimension( d ), d );
 			}
-		}
-
-		if( debug )
-		{
-			long endTime = System.currentTimeMillis();
-			System.out.println( "took " + (endTime - startTime) +" ms" );
 		}
 	}
 
