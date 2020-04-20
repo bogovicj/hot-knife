@@ -62,6 +62,8 @@ public class BsplineTest1d
 
 //		linTest( 3 );
 
+//		quadTest( 3 );
+
 //		sinWindowTest();
 
 //		chirpWindowTest();
@@ -70,6 +72,26 @@ public class BsplineTest1d
 		System.out.println("done");
 	}
 	
+	public static void quadTest( int order ) throws IOException
+	{
+		final double a = -1;
+		final double b = 8;
+		final double c = -15;
+		BiConsumer<RealLocalizable,DoubleType> fun = new BiConsumer<RealLocalizable,DoubleType>(){
+			@Override
+			public void accept( RealLocalizable p, DoubleType t )
+			{
+				double x = p.getDoublePosition(0);
+				t.setReal( a * x * x - b * x + c );
+			}
+		};
+		RealRandomAccessible<DoubleType> realImg = funRealImage( new DoubleType(), 1, fun );
+
+		double step = 0.2;
+		FinalInterval fullItvl = new FinalInterval( 32 );
+
+		interpVsReal(realImg, order, fullItvl, 3, 5, 0.2 );
+	}
 
 	public static void linTest( int order ) throws IOException
 	{
@@ -88,7 +110,7 @@ public class BsplineTest1d
 		double step = 0.2;
 		FinalInterval fullItvl = new FinalInterval( 32 );
 
-		interpVsReal(realImg, order, fullItvl );
+		interpVsReal(realImg, order, fullItvl, 16, 17, 0.1);
 	}
 
 	public static void impulseTest( int order ) throws IOException
@@ -97,7 +119,10 @@ public class BsplineTest1d
 			@Override
 			public void accept( RealLocalizable p, DoubleType t )
 			{
-				t.setReal( 1.0 );
+				if( p.getDoublePosition( 0 ) == 0 )
+					t.setOne();
+				else
+					t.setZero();
 			}
 		};
 		RealRandomAccessible<DoubleType> realImg = funRealImage( new DoubleType(), 1, fun );
@@ -105,7 +130,7 @@ public class BsplineTest1d
 		double step = 0.2;
 		FinalInterval fullItvl = new FinalInterval( 32 );
 
-		interpVsReal(realImg, order, fullItvl );
+		interpVsReal(realImg, order, fullItvl, -1, 1, 0.1 );
 	}
 	
 	public static void constTest( int order ) throws IOException
@@ -122,7 +147,7 @@ public class BsplineTest1d
 		double step = 0.2;
 		FinalInterval fullItvl = new FinalInterval( 32 );
 
-		interpVsReal(realImg, order, fullItvl );
+		interpVsReal(realImg, order, fullItvl, 16, 17, 0.1 );
 	}
 
 	public static void linTestFvS( int order ) throws IOException
@@ -199,7 +224,7 @@ public class BsplineTest1d
 	}
 
 	public static void interpVsReal( final RealRandomAccessible<DoubleType> realImg, final int order,
-			final Interval testItvl )
+			final Interval testItvl, double min, double max, double step )
 
 	{
 		IntervalView<DoubleType> img = Views.interval( Views.raster( realImg ), testItvl );
@@ -214,33 +239,33 @@ public class BsplineTest1d
 		BSplineCoefficientsInterpolator interp = new BSplineCoefficientsInterpolator( 
 				fullCoefs, order );
 		
-		interp.setPosition( 16.4, 0 );
-		System.out.println( " f(16.4) = " + interp.get());
-
-		System.out.println( " " );
-		System.out.println( " " );
-		System.out.println( " " );
-
-		interp.setPosition( 16.9, 0 );
-		System.out.println( " f(16.9) = " + interp.get());
+//		interp.setPosition( 16.4, 0 );
+//		System.out.println( " f(16.4) = " + interp.get());
+//
+//		System.out.println( " " );
+//		System.out.println( " " );
+//		System.out.println( " " );
+//
+//		interp.setPosition( 16.9, 0 );
+//		System.out.println( " f(16.9) = " + interp.get());
 
 //		System.out.println( " " );
 //		System.out.println( "coefs: " );
 //		print( fullCoefs );
 //
-//
-//		System.out.println( " " );
-//		System.out.println( "real: " );
-//		print( realImg.realRandomAccess(), 16, 17, 0.1  );
-//
-//		System.out.println( " " );
-//
-//		System.out.println( "interp: " );
-//		print( interp, 16, 17, 0.1  );
+
+		System.out.println( " " );
+		System.out.println( "real: " );
+		print( realImg.realRandomAccess(), min, max, step);
+
+		System.out.println( " " );
+		System.out.println( "interp: " );
+		print( interp, min, max, step );
 		
 
-//		System.out.println( "diff: " );
-//		printDiff( realImg.realRandomAccess(), interp, testItvl.realMin(0), testItvl.realMax(0), step );
+		System.out.println( " " );
+		System.out.println( "diff: " );
+		printDiff( realImg.realRandomAccess(), interp, min, max, step );
 	}
 	
 	public static void fullVsSub( final RandomAccessibleInterval<DoubleType> img, final Interval subItvl, final int order )
