@@ -31,20 +31,31 @@
  * POSSIBILITY OF SUCH DAMAGE.
  * #L%
  */
-
 package net.imglib2.bspline;
 
+import net.imglib2.Interval;
 import net.imglib2.RandomAccessible;
+import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.RealInterval;
+import net.imglib2.RealRandomAccess;
+import net.imglib2.img.ImgFactory;
 import net.imglib2.interpolation.InterpolatorFactory;
 import net.imglib2.type.Type;
+import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
+import net.imglib2.util.Util;
+import net.imglib2.view.Views;
 
-public class BSplineCoefficientsInterpolatorFactory implements InterpolatorFactory< DoubleType, RandomAccessible< DoubleType > >
+public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S extends RealType<S>> implements InterpolatorFactory< S, RandomAccessible< T > >
 {
-	final int order;
+	protected final int order;
 
-	final boolean clipping;
+	protected final boolean clipping;
+
+	protected final RandomAccessibleInterval<S> coefficients;
+	
+	// TODO
+//	protected OutOfBoundsFactory<S,RandomAccessibleInterval<S>> oobFactory;
 
 	/**
 	 * Creates a new {@link BSplineCoefficientsInterpolatorFactory} using the BSpline 
@@ -57,49 +68,84 @@ public class BSplineCoefficientsInterpolatorFactory implements InterpolatorFacto
 	 *            smaller than the original values, so they can be clipped to
 	 *            the range of the {@link Type} if wanted
 	 */
-	public BSplineCoefficientsInterpolatorFactory( final int order, final boolean clipping )
+	public BSplineCoefficientsInterpolatorFactory( 
+			final RandomAccessible<T> img,
+			final Interval interval,
+			final int order, final boolean clipping, 
+			final ImgFactory<S> coefficientFactory )
 	{
 		this.order = order;
 		this.clipping = clipping;
+
+		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( img );
+		coefficients = coefficientFactory.create( interval );
+		decomp.accept( coefficients );
 	}
 
-	/**
-	 * Creates a new {@link BSplineCoefficientsInterpolatorFactory} using the BSpline
-	 * interpolation in a certain window
-	 *
-	 * @param order
-	 *            the order of the bspline
-	 *            
-	 */
-	public BSplineCoefficientsInterpolatorFactory( final int order )
+	public BSplineCoefficientsInterpolatorFactory( final RandomAccessible<T> img, final Interval interval, final int order, final boolean clipping,
+			S coefficientType )
 	{
-		this.order = order;
-		this.clipping = true;
+		this( img, interval, order, clipping, Util.getSuitableImgFactory( interval, coefficientType ));
 	}
 
-	/**
-	 * Creates a new {@link BSplineCoefficientsInterpolatorFactory} with standard parameters
-	 * (do clipping, alpha=3)
-	 */
-	public BSplineCoefficientsInterpolatorFactory()
+	@SuppressWarnings("unchecked")
+	public BSplineCoefficientsInterpolatorFactory( final RandomAccessible<T> img, final Interval interval, final int order, final boolean clipping )
 	{
-		this( 3, true );
+		this( img, interval, order, clipping, (S)new DoubleType() );
+	}
+
+	@SuppressWarnings("unchecked")
+	public BSplineCoefficientsInterpolatorFactory( final RandomAccessible<T> img, final Interval interval, final int order )
+	{
+		this( img, interval, order, true, (S)new DoubleType() );
+	}
+
+	@SuppressWarnings("unchecked")
+	public BSplineCoefficientsInterpolatorFactory( final RandomAccessible<T> img, final Interval interval )
+	{
+		this( img, interval, 3, true, (S)new DoubleType());
+	}
+
+	@SuppressWarnings("unchecked")
+	public BSplineCoefficientsInterpolatorFactory( final RandomAccessibleInterval<T> img )
+	{
+		this( img, img, 3, true, (S)new DoubleType());
+	}
+
+	public BSplineCoefficientsInterpolatorFactory( final RandomAccessibleInterval<T> img,  final int order, final boolean clipping,
+			S coefficientType )
+	{
+		this( img, img, order, clipping, Util.getSuitableImgFactory( img, coefficientType ));
+	}
+
+	@SuppressWarnings("unchecked")
+	public BSplineCoefficientsInterpolatorFactory( final RandomAccessibleInterval<T> img, final int order, final boolean clipping )
+	{
+		this( img, img, order, clipping, (S)new DoubleType() );
+	}
+
+	@SuppressWarnings("unchecked")
+	public BSplineCoefficientsInterpolatorFactory( final RandomAccessibleInterval<T> img, final int order )
+	{
+		this( img, img, order, true, (S)new DoubleType() );
 	}
 
 	@Override
-	public BSplineCoefficientsInterpolator create( final RandomAccessible< DoubleType > coefficients )
+	public BSplineCoefficientsInterpolator<S> create( RandomAccessible<T> f )
 	{
-		return new BSplineCoefficientsInterpolator( coefficients, order );
+		return new BSplineCoefficientsInterpolator<S>( 
+				Views.extendZero( coefficients ), order, Util.getTypeFromInterval( coefficients ) );
+
+		// TODO generalize extension of coefficients
+//		return new BSplineCoefficientsInterpolator<S>( 
+//				new ExtendedRandomAccessibleInterval<>( coefficients, oobFactory ),
+//				order, Util.getTypeFromInterval( coefficients ) );
 	}
 
-	/**
-	 * For now, ignore the {@link RealInterval} and return
-	 * {@link #create(RandomAccessible)}.
-	 */
 	@Override
-	public BSplineCoefficientsInterpolator create( final RandomAccessible< DoubleType > coefficients, final RealInterval interval )
+	public RealRandomAccess<S> create( RandomAccessible<T> f, RealInterval interval )
 	{
-		return create( coefficients );
+		return create( f );
 	}
-
+	
 }

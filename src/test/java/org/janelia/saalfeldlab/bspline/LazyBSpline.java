@@ -31,6 +31,7 @@ import net.imglib2.Volatile;
 import net.imglib2.bspline.BSplineCoefficientsInterpolator;
 import net.imglib2.bspline.BSplineCoefficientsInterpolatorFactory;
 import net.imglib2.bspline.BSplineDecomposition;
+import net.imglib2.bspline.BSplineLazyCoefficientsInterpolatorFactory;
 import net.imglib2.converter.Converters;
 import net.imglib2.img.array.ArrayImg;
 import net.imglib2.img.array.ArrayImgs;
@@ -83,7 +84,7 @@ public class LazyBSpline {
 
 	public static RandomAccessibleInterval<DoubleType> flyImg()
 	{
-		final ImagePlus imp = IJ.openImage( "/Users/bogovicj/Documents/projects/jrc2018/jrc18_demo_sample_data/JRC2018_FEMALE_small.tif" );
+		final ImagePlus imp = IJ.openImage( "/home/john/projects/jrc2018/small_test_data/JRC2018_FEMALE_small.tif" );
 		System.out.println( "imp: " + imp );
 		imp.show();
 
@@ -193,7 +194,7 @@ public class LazyBSpline {
 		final BSplineDecomposition<DoubleType,DoubleType> coefsAlg = new BSplineDecomposition<DoubleType,DoubleType>( 3, ext );
 		RandomAccessibleInterval<DoubleType> coefStorage = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
 		coefsAlg.accept( coefStorage );
-		BSplineCoefficientsInterpolator coefsImg = new BSplineCoefficientsInterpolator( Views.extendZero( coefStorage ), 3 );
+		BSplineCoefficientsInterpolator<DoubleType> coefsImg = new BSplineCoefficientsInterpolator<>( Views.extendZero( coefStorage ), 3, new DoubleType() );
 		RealRandomAccessible<DoubleType> interpImg = Views.interpolate( imgDouble, coefsImg );
 
 		// Lazy bspline coefficients Has artifacts
@@ -204,7 +205,7 @@ public class LazyBSpline {
 				new DoubleType(),
 				AccessFlags.setOf( AccessFlags.VOLATILE ),
 				coefsAlgForLazy);
-		BSplineCoefficientsInterpolator coefsImgLazy = new BSplineCoefficientsInterpolator( Views.extendZero( coefStorageLazy ), 3 );
+		BSplineCoefficientsInterpolator<DoubleType> coefsImgLazy = new BSplineCoefficientsInterpolator<>( Views.extendZero( coefStorageLazy ), 3, new DoubleType() );
 		RealRandomAccessible<DoubleType> interpImgLazy = Views.interpolate( 
 				imgDouble, coefsImgLazy );
 		
@@ -244,7 +245,7 @@ public class LazyBSpline {
 		RandomAccessibleInterval<DoubleType> coefStorage = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
 		coefsAlg.accept( coefStorage );
 
-		BSplineCoefficientsInterpolator coefsImg = new BSplineCoefficientsInterpolator( Views.extendZero( coefStorage ), 3 );
+		BSplineCoefficientsInterpolator<DoubleType> coefsImg = new BSplineCoefficientsInterpolator<>( Views.extendZero( coefStorage ), 3, new DoubleType() );
 		RealRandomAccessible<DoubleType> interpImg = Views.interpolate( imgDouble, coefsImg );
 		
 		BSplineInterpolatorFactory<DoubleType> onTheFlyFactory = new BSplineInterpolatorFactory<DoubleType>();
@@ -260,7 +261,7 @@ public class LazyBSpline {
 				AccessFlags.setOf( AccessFlags.VOLATILE ),
 				coefsAlgForLazy);
 
-		BSplineCoefficientsInterpolator coefsImgLazy = new BSplineCoefficientsInterpolator( Views.extendZero( coefStorageLazy ), 3 );
+		BSplineCoefficientsInterpolator<DoubleType> coefsImgLazy = new BSplineCoefficientsInterpolator<>( Views.extendZero( coefStorageLazy ), 3, new DoubleType() );
 		RealRandomAccessible<DoubleType> interpImgLazy = Views.interpolate( 
 				imgDouble, coefsImgLazy );
 		
@@ -348,21 +349,26 @@ public class LazyBSpline {
 //		System.out.println( "done" );
 
 
-		final BSplineDecomposition<DoubleType,DoubleType> coefsAlgForLazy = new BSplineDecomposition<DoubleType,DoubleType>( 
-				3, ext );
-		// lazy
-		final RandomAccessibleInterval<DoubleType> coefImgLazy = Lazy.process(
-				img,
-				blockSize,
-				new DoubleType(),
-				AccessFlags.setOf( AccessFlags.VOLATILE ),
-				coefsAlgForLazy);
+
+//		final BSplineDecomposition<DoubleType,DoubleType> coefsAlgForLazy = new BSplineDecomposition<DoubleType,DoubleType>( 
+//				3, ext );
+//		// lazy
+//		final RandomAccessibleInterval<DoubleType> coefImgLazy = Lazy.process(
+//				img,
+//				blockSize,
+//				new DoubleType(),
+//				AccessFlags.setOf( AccessFlags.VOLATILE ),
+//				coefsAlgForLazy);
+
 		
 //		RealRandomAccessible<DoubleType> interpImg = Views.interpolate( 
 //				Views.extendZero( coefImg ), new BSplineCoefficientsInterpolatorFactory( 3 ));
 
 		RealRandomAccessible<DoubleType> interpImg = Views.interpolate( 
-				Views.extendZero( coefImgLazy ), new BSplineCoefficientsInterpolatorFactory( 3 ));
+				ext, new BSplineCoefficientsInterpolatorFactory<DoubleType,DoubleType>( ext, img, 3 ));
+		
+		RealRandomAccessible<DoubleType> interpImgLazy = Views.interpolate( ext, 
+				new BSplineLazyCoefficientsInterpolatorFactory<DoubleType,DoubleType>( ext, img, 3,  blockSize ));
 		
 
 		// LOOKING GOOD

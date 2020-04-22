@@ -98,6 +98,11 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	{
 		this.doLastDimOptimization = lastDimOpt;
 	}
+	
+	public RandomAccessible<T> getImage()
+	{
+		return img;
+	}
 
 	public static double[] polesCi( double[] poles )
 	{
@@ -458,7 +463,6 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 
 				srcAccess.bck( dimension );
 				destAccess.bck( dimension );
-
 			}
 		}
 	}
@@ -492,7 +496,7 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 //				System.out.println( "pad fwd coef at " + access.getIntPosition(0) + " : " + padding[ i ] );
 //			}
 		}
-		
+
 		// initialize anticausal
 		// coefs[ N-1 ] = Ci * ( coefs[ N-1 ] + z * coefs[ N-2 ] );
 
