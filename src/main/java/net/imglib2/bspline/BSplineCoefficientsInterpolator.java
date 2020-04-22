@@ -46,6 +46,7 @@ import net.imglib2.interpolation.InterpolatorFactory;
 import net.imglib2.neighborhood.Neighborhood;
 import net.imglib2.neighborhood.RectangleShape;
 import net.imglib2.position.transform.Floor;
+import net.imglib2.position.transform.Round;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
 import net.imglib2.view.Views;
@@ -57,20 +58,9 @@ import net.imglib2.view.Views;
  * @author John Bogovic
  * @author Stephan Saalfeld
  */
-public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighborhood< DoubleType >>> implements RealRandomAccess< DoubleType >, InterpolatorFactory< DoubleType, RandomAccessibleInterval<DoubleType> >, Localizable
+public class BSplineCoefficientsInterpolator<T extends RealType<T>> extends Round< RandomAccess< Neighborhood< T >>> implements RealRandomAccess< T >, InterpolatorFactory< T, RandomAccessibleInterval<T> >, Localizable
 {
-	public static final double SQRT3 = Math.sqrt ( 3.0 );
-	
-	// from Unser box 2 page 26
-	public static final double Z1 = SQRT3 - 2;
-
-	public static final double Ci = -Z1 / ( 1 - (Z1*Z1));
-	
-	public static final double ONESIXTH = 1.0 / 6.0;
-	public static final double TWOTHIRDS = 2.0 / 3.0;
-	public static final double FOURTHIRDS = 4.0 / 3.0;
-
-	final protected DoubleType value;
+	final protected T value;
 	
 	final protected double[][] weights;
 	
@@ -138,14 +128,14 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 		}
 	}
 
-	public BSplineCoefficientsInterpolator( final BSplineCoefficientsInterpolator interpolator, final int order )
+	public BSplineCoefficientsInterpolator( final BSplineCoefficientsInterpolator< T > interpolator, final int order, final T type )
 	{
 		super( interpolator.target.copyRandomAccess() );
 
 		this.bsplineOrder = interpolator.bsplineOrder;
 		this.shape = shapeFromOrder( bsplineOrder );
 
-		value = new DoubleType();
+		value = type.copy();
 
 		// this should change when we stop using rectangleshapes
 		kernelWidth = 2 * shape.getSpan() + 1;
@@ -154,19 +144,19 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 		weights = new double[ numDimensions() ][ kernelWidth ];
 	}
 
-	public BSplineCoefficientsInterpolator( final RandomAccessible< DoubleType > coefficients, final int order )
+	public BSplineCoefficientsInterpolator( final RandomAccessible< T > coefficients, final int order, final T type )
 	{
-		this( coefficients, order, shapeFromOrder( order ));
+		this( coefficients, order, type, shapeFromOrder( order ));
 	}
 
-	private BSplineCoefficientsInterpolator( final RandomAccessible< DoubleType > coefficients, final int order, final RectangleShape shape )
+	private BSplineCoefficientsInterpolator( final RandomAccessible< T > coefficients, final int order, final T type, final RectangleShape shape )
 	{
 		super( shape.neighborhoodsRandomAccessible( coefficients ).randomAccess() );
 
 		this.shape = shape;
 		this.bsplineOrder = order;
 
-		value = new DoubleType();
+		value = type.copy();
 
 		// this should change when we stop using rectangleshapes
 		kernelWidth = 2 * shape.getSpan() + 1;
@@ -176,12 +166,13 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 	}
 
 	@Override
-	public DoubleType get()
+	public T get()
 	{
 		fillWeights();
+//		System.out.println( "get NEW");
 
 		double accumulator = 0;
-		final Cursor< DoubleType > c = target.get().cursor();
+		final Cursor< T > c = target.get().cursor();
 		while ( c.hasNext() )
 		{
 			double tmp = c.next().getRealDouble();
@@ -189,19 +180,11 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 			{
 				final int index = ( int ) ( c.getLongPosition( d ) - target.getLongPosition( d ) + shape.getSpan() );
 
-//				// debug
-//				if( index >=  weights[d].length )
-//				{
-//					System.out.println( "cpos: " + c.getLongPosition( d ) );
-//					System.out.println( "tpos: " + target.getLongPosition( d ) );
-//					System.out.println( "span: " + shape.getSpan());
-//				}
-
-//				tmp *= weights[ d ][ index ];
-
 				// This check seems necessary after using too-big rectangle shape
 				if( index <  weights[d].length )
 					tmp *= weights[ d ][ index ];
+				else
+					tmp = 0;
 			}
 			accumulator += tmp;
 		}
@@ -213,21 +196,34 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 	@Override
 	public long getLongPosition(int d)
 	{
-		return (long)Math.floor( position[ d ]);
+		return (long)Math.round( position[ d ]);
 	}
 
 	// TODO generalize for any order spline
 	protected void fillWeights()
 	{
-		final Neighborhood< DoubleType > rect = target.get();
+//		System.out.println("fill weights");
+		final Neighborhood< T > rect = target.get();
 		for ( int d = 0; d < numDimensions(); d++ )
 		{
 			final double pos = position[ d ];
 			final long min = rect.min( d );
 			final long max = rect.max( d );
+//			System.out.println("      pos : " +  pos );
+//			System.out.println("      min : " +  min );
 			for ( long i = min; i <= max; ++i )
+			{
 				weights[ d ][ ( int ) ( i - min ) ] = kernel.evaluateNorm( pos - i );
+
+//				System.out.println("        i : " +  i );
+//				System.out.println("  i - min : " + (i-min));
+//				System.out.println("  pos-i : " + (pos-i));
+//				System.out.println("      w : " + weights[ d ][ (int)(i-min)] );
+//				System.out.println(" ");
+			}
 		}
+//		System.out.println(" ");
+//		System.out.println(" ");
 	} 
 
 	public <T extends RealType<T>> void printValues( RandomAccessibleInterval<T> vals )
@@ -248,60 +244,27 @@ public class BSplineCoefficientsInterpolator extends Floor< RandomAccess< Neighb
 		}
 		System.out.print( "\n");
 	}
-	
-	/*
-	 * Third order spline kernel
-	 */
-	public static double evaluate3( final double u )
-	{
-		final double absValue = Math.abs( u );
-		final double sqrValue = u * u;
-		if ( absValue < 1.0 )
-			return ( 4.0 - 6.0 * sqrValue + 3.0 * sqrValue * absValue );
-		else if ( absValue < 2.0 )
-			return ( 8.0 - 12.0 * absValue + 6.0 * sqrValue - sqrValue * absValue );
-		else
-			return 0.0;
-	}
 
-	/*
-	 * Third order spline kernel
-	 */
-	public static double evaluate3Normalized( final double u )
+	@Override
+	public BSplineCoefficientsInterpolator<T> copy()
 	{
-		final double absValue = Math.abs( u );
-		final double sqrValue = u * u;
-		if ( absValue <= 1.0 )
-			return ( TWOTHIRDS - sqrValue + 0.5 * sqrValue * absValue );
-		else if ( absValue < 2.0 )
-		{
-			final double twoMinusAbsValue = 2 - absValue;
-			return twoMinusAbsValue * twoMinusAbsValue * twoMinusAbsValue * ONESIXTH;
-		}
-		else
-			return 0.0;
+		return new BSplineCoefficientsInterpolator<T>( this, this.bsplineOrder, value );
 	}
 
 	@Override
-	public BSplineCoefficientsInterpolator copy()
-	{
-		return new BSplineCoefficientsInterpolator( this, this.bsplineOrder );
-	}
-
-	@Override
-	public RealRandomAccess<DoubleType> create(RandomAccessibleInterval<DoubleType> f)
+	public RealRandomAccess<T> create( RandomAccessibleInterval<T> f)
 	{
 		return copy();
 	}
 
 	@Override
-	public RealRandomAccess<DoubleType> create(RandomAccessibleInterval<DoubleType> f, RealInterval interval)
+	public RealRandomAccess< T > create(RandomAccessibleInterval< T > f, RealInterval interval)
 	{
 		return copy();
 	}
 
 	@Override
-	public RealRandomAccess<DoubleType> copyRealRandomAccess()
+	public RealRandomAccess< T > copyRealRandomAccess()
 	{
 		return copy();
 	}
