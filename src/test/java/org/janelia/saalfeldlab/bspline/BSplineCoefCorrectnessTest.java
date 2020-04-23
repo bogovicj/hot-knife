@@ -29,12 +29,35 @@ import net.imglib2.view.Views;
 
 public class BSplineCoefCorrectnessTest
 {
+
+	@Test
+	public void test2Spline1d()
+	{
+		RandomAccessibleInterval< DoubleType > p0 = ConstantUtils.constantRandomAccessibleInterval( new DoubleType( 1 ), new FinalInterval( 32 ));
+
+		BSplineCoefficientsInterpolator<DoubleType> spline2p0 = new BSplineCoefficientsInterpolatorFactory( p0, 2  ).create( p0 );
+
+		spline2p0.setPosition( 15.5, 0 );
+		System.out.println( spline2p0.get() );
+		Assert.assertEquals("spline2 p0", 1.0, spline2p0.get().getRealDouble(), 1e-4 );
+
+		RandomAccessibleInterval<DoubleType> p1 = Views.interval( 
+				polynomialImg1dC( new double[]{ 1, 1 }), new FinalInterval( 32 ));
+
+		BSplineCoefficientsInterpolator<DoubleType> spline2p1 = new BSplineCoefficientsInterpolatorFactory( p1, 2 ).create( p1 );
+
+		spline2p1.setPosition( 15.5, 0 );
+		System.out.println( spline2p1.get() );
+		Assert.assertEquals("spline2 p1", 16.5, spline2p1.get().getRealDouble(), 0.1 );
+
+	}
+
 	@Test
 	public void test3Spline1d()
 	{
 		RandomAccessibleInterval< DoubleType > p0 = ConstantUtils.constantRandomAccessibleInterval( new DoubleType( 1 ), new FinalInterval( 32 ));
 
-		BSplineCoefficientsInterpolator spline3p0 = new BSplineCoefficientsInterpolatorFactory( p0, 3  ).create( p0 );
+		BSplineCoefficientsInterpolator<DoubleType> spline3p0 = new BSplineCoefficientsInterpolatorFactory( p0, 3  ).create( p0 );
 
 		spline3p0.setPosition( 15.5, 0 );
 		System.out.println( spline3p0.get() );
@@ -43,7 +66,7 @@ public class BSplineCoefCorrectnessTest
 		RandomAccessibleInterval<DoubleType> p1 = Views.interval( 
 				polynomialImg1dC( new double[]{ 1, 1 }), new FinalInterval( 32 ));
 
-		BSplineCoefficientsInterpolator spline3p1 = new BSplineCoefficientsInterpolatorFactory( p1, 3 ).create( p1 );
+		BSplineCoefficientsInterpolator<DoubleType> spline3p1 = new BSplineCoefficientsInterpolatorFactory( p1, 3 ).create( p1 );
 
 		spline3p1.setPosition( 15.5, 0 );
 		System.out.println( spline3p1.get() );

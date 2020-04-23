@@ -44,6 +44,7 @@ import net.imglib2.type.Type;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
 import net.imglib2.util.Util;
+import net.imglib2.view.ExtendedRandomAccessibleInterval;
 import net.imglib2.view.Views;
 
 public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S extends RealType<S>> implements InterpolatorFactory< S, RandomAccessible< T > >
@@ -71,13 +72,14 @@ public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S ext
 	public BSplineCoefficientsInterpolatorFactory( 
 			final RandomAccessible<T> img,
 			final Interval interval,
-			final int order, final boolean clipping, 
+			final int order, 
+			final boolean clipping, 
 			final ImgFactory<S> coefficientFactory )
 	{
 		this.order = order;
 		this.clipping = clipping;
 
-		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( img );
+		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( order, img );
 		coefficients = coefficientFactory.create( interval );
 		decomp.accept( coefficients );
 	}
@@ -133,13 +135,17 @@ public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S ext
 	@Override
 	public BSplineCoefficientsInterpolator<S> create( RandomAccessible<T> f )
 	{
-		return new BSplineCoefficientsInterpolator<S>( 
-				Views.extendZero( coefficients ), order, Util.getTypeFromInterval( coefficients ) );
+		// why doesn't this line work
+//		BSplineCoefficientsInterpolator<S>.build( order, Views.extendZero( coefficients ), (S) Util.getTypeFromInterval( coefficients ) );
+		
+		ExtendedRandomAccessibleInterval<S, RandomAccessibleInterval<S>> coefExt = Views.extendZero( coefficients );
+		S type = Util.getTypeFromInterval( coefficients );
+		if( order % 2 == 0 )
+			return new BSplineCoefficientsInterpolatorEven<S>( order, coefExt, type, true );
+		else
+			return new BSplineCoefficientsInterpolatorOdd<S>( order, coefExt, type, true );
 
-		// TODO generalize extension of coefficients
-//		return new BSplineCoefficientsInterpolator<S>( 
-//				new ExtendedRandomAccessibleInterval<>( coefficients, oobFactory ),
-//				order, Util.getTypeFromInterval( coefficients ) );
+		// TODO generalize extension
 	}
 
 	@Override

@@ -5,7 +5,6 @@ package org.janelia.saalfeldlab.bspline;
 
 import java.io.File;
 import java.io.IOException;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.function.BiConsumer;
 
@@ -25,6 +24,7 @@ import net.imglib2.RealRandomAccess;
 import net.imglib2.RealRandomAccessible;
 import net.imglib2.RealRandomAccessibleRealInterval;
 import net.imglib2.bspline.BSplineCoefficientsInterpolator;
+import net.imglib2.bspline.BSplineCoefficientsInterpolatorEven;
 import net.imglib2.bspline.BSplineCoefficientsInterpolatorFactory;
 import net.imglib2.bspline.BSplineDecomposition;
 import net.imglib2.img.Img;
@@ -61,17 +61,17 @@ public class BsplineTest1d
 	{
 //		new ImageJ();
 
-//		constTest( 3 );
-//		System.out.println("\n#######################\n");
+		constTest( 2 );
+		System.out.println("\n#######################\n");
 
-//		linTest( 2 );
+//		linTest( 3 );
 //		System.out.println("\n#######################\n");
 
 //		quadTestV2( 3 );
 //		System.out.println("\n#######################\n");
 
-		cubTest( 3 );
-		System.out.println("\n#######################\n");
+//		cubTest( 3 );
+//		System.out.println("\n#######################\n");
 
 //		quadTest( 3 );
 
@@ -79,8 +79,19 @@ public class BsplineTest1d
 
 //		chirpWindowTest();
 
+//		oneOffTest();
 
 		System.out.println("done");
+	}
+	
+	public static void oneOffTest()
+	{
+		RandomAccessibleInterval< DoubleType > p0 = ConstantUtils.constantRandomAccessibleInterval( new DoubleType( 1 ), new FinalInterval( 32 ));
+
+		BSplineCoefficientsInterpolator<DoubleType> spline2p0 = new BSplineCoefficientsInterpolatorFactory( p0, 2  ).create( p0 );
+
+		spline2p0.setPosition( 15.55, 0 );
+		System.out.println( spline2p0.get() );
 	}
 
 	public static void cubTest( int order ) throws IOException
@@ -206,7 +217,32 @@ public class BsplineTest1d
 
 		FinalInterval fullItvl = new FinalInterval( 32 );
 
-		interpVsReal(realImg, order, fullItvl, 3, 5, 0.1 );
+		interpVsReal(realImg, order, fullItvl, 15, 17, 0.1 );
+//		newThing( realImg, fullItvl );
+	}
+	
+	public static void newThing( RealRandomAccessible<DoubleType> realImg, Interval fullItvl )
+	{
+		IntervalView<DoubleType> img = Views.interval( Views.raster( realImg ), fullItvl );
+
+		int order = 2;
+		final BSplineDecomposition<DoubleType,DoubleType> coefsAlg = new BSplineDecomposition<DoubleType,DoubleType>( 
+				order, Views.extendMirrorSingle( img ));
+
+		System.out.println( "COMPUTE COEFS" );
+		ArrayImg<DoubleType, DoubleArray> fullCoefs = ArrayImgs.doubles( fullItvl.dimension( 0 ));
+		coefsAlg.accept( fullCoefs );
+		
+//		BSplineCoefficientsInterpolatorEven<DoubleType> interp = new BSplineCoefficientsInterpolatorEven<>( 
+//				fullCoefs, order, new DoubleType() );
+
+		BSplineCoefficientsInterpolator<DoubleType> interp = BSplineCoefficientsInterpolator.build( 
+				order, Views.extendZero( fullCoefs ), new DoubleType() );
+		
+		interp.setPosition(16.2, 0);
+		System.out.println( interp.get());
+		interp.setPosition(16.8, 0);
+		System.out.println( interp.get());
 	}
 
 	public static void linTestFvS( int order ) throws IOException
@@ -236,8 +272,8 @@ public class BsplineTest1d
 		IntervalView<DoubleType> subCoefs = Views.translate( ArrayImgs.doubles( subItvl.dimension( 0 )), subItvl.min( 0 ));
 		coefsAlg.accept( subCoefs );
 
-		BSplineCoefficientsInterpolator<DoubleType> subInterp = new BSplineCoefficientsInterpolator<>( 
-				Views.extendMirrorSingle( subCoefs ), order, new DoubleType() );
+		BSplineCoefficientsInterpolator<DoubleType> subInterp = BSplineCoefficientsInterpolator.build(
+				order, Views.extendMirrorSingle( subCoefs ), new DoubleType() );
 
 		subInterp.setPosition( 16, 0);
 		System.out.println( " val at 16 : " + subInterp.get() );
@@ -298,38 +334,42 @@ public class BsplineTest1d
 		ArrayImg<DoubleType, DoubleArray> fullCoefs = ArrayImgs.doubles( fullItvl.dimension( 0 ));
 		coefsAlg.accept( fullCoefs );
 		
-		BSplineCoefficientsInterpolator<DoubleType> interp = new BSplineCoefficientsInterpolator<>( fullCoefs, order, new DoubleType() );
+		//Views.extendZero( fullCoefs );
+		
+		BSplineCoefficientsInterpolator<DoubleType> interp = BSplineCoefficientsInterpolator.build(
+				order, fullCoefs, new DoubleType() );
 
-//		interp.setPosition( 16.4, 0 );
-//		System.out.println( " f(16.4) = " + interp.get());
+		interp.setPosition( 16.2, 0 );
+		System.out.println( " f(16.2) = " + interp.get());
+
+		System.out.println( " " );
+		System.out.println( " " );
+		System.out.println( " " );
+
+		interp.setPosition( 16.8, 0 );
+		System.out.println( " f(16.8) = " + interp.get());
+
+//		System.out.println( " " );
+//		System.out.println( "all coefs: " );
+//		print( fullCoefs );
+
 //
 //		System.out.println( " " );
-//		System.out.println( " " );
-//		System.out.println( " " );
+//		System.out.println( "coefs: " );
+//		print( fullCoefs.randomAccess(), (long)Math.round(min), (long)Math.round(max) );
 //
-//		interp.setPosition( 16.9, 0 );
-//		System.out.println( " f(16.9) = " + interp.get());
-
-		System.out.println( " " );
-		System.out.println( "all coefs: " );
-		print( fullCoefs );
-
-		System.out.println( " " );
-		System.out.println( "coefs: " );
-		print( fullCoefs.randomAccess(), (long)Math.round(min), (long)Math.round(max) );
-
-		System.out.println( " " );
-		System.out.println( "real: " );
-		print( realImg.realRandomAccess(), min, max, step);
-
-		System.out.println( " " );
-		System.out.println( "interp: " );
-		print( interp, min, max, step );
+//		System.out.println( " " );
+//		System.out.println( "real: " );
+//		print( realImg.realRandomAccess(), min, max, step);
+//
+//		System.out.println( " " );
+//		System.out.println( "interp: " );
+//		print( interp, min, max, step );
 		
 
-		System.out.println( " " );
-		System.out.println( "diff: " );
-		printDiff( realImg.realRandomAccess(), interp, min, max, step );
+//		System.out.println( " " );
+//		System.out.println( "diff: " );
+//		printDiff( realImg.realRandomAccess(), interp, min, max, step );
 	}
 	
 	public static void fullVsSub( final RandomAccessibleInterval<DoubleType> img, final Interval subItvl, final int order )
@@ -357,11 +397,11 @@ public class BsplineTest1d
 		printDiff( subCoefs, fullCoefs );
 
 
-		BSplineCoefficientsInterpolator<DoubleType> fullInterp = new BSplineCoefficientsInterpolator<>( 
-				Views.extendMirrorSingle( fullCoefs ), order, new DoubleType() );
+		BSplineCoefficientsInterpolator<DoubleType> fullInterp = BSplineCoefficientsInterpolator.build(
+				order, Views.extendMirrorSingle( fullCoefs ), new DoubleType() );
 
-		BSplineCoefficientsInterpolator<DoubleType> subInterp = new BSplineCoefficientsInterpolator<>( 
-				Views.extendMirrorSingle( subCoefs ), order, new DoubleType() );
+		BSplineCoefficientsInterpolator<DoubleType> subInterp = BSplineCoefficientsInterpolator.build(
+				order, Views.extendMirrorSingle( subCoefs ), new DoubleType() );
 		
 		System.out.println( " ");
 		System.out.println( "full interp img: ");
@@ -489,7 +529,8 @@ public class BsplineTest1d
 		final BSplineDecomposition<DoubleType,DoubleType> coefsAlg = new BSplineDecomposition<DoubleType,DoubleType>( 
 				3, Views.extendMirrorSingle( chirp ));
 
-		BSplineCoefficientsInterpolator interp = new BSplineCoefficientsInterpolator( Views.extendMirrorSingle(chirp), 3, new DoubleType() );
+		BSplineCoefficientsInterpolator interp = BSplineCoefficientsInterpolator.build(
+				3, Views.extendMirrorSingle(chirp), new DoubleType() );
 		
 		interp.setPosition( 5.5, 0 );
 		System.out.println( interp.get() );
