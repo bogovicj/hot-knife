@@ -4,8 +4,10 @@ import java.util.Arrays;
 
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.RealPoint;
+import net.imglib2.RealRandomAccess;
 import net.imglib2.bspline.BSplineCoefficientsInterpolator;
 import net.imglib2.bspline.BSplineCoefficientsInterpolatorFactory;
+import net.imglib2.bspline.BSplineCoefficientsInterpolatorOld;
 import net.imglib2.bspline.BSplineDecomposition;
 import net.imglib2.img.array.ArrayCursor;
 import net.imglib2.img.array.ArrayImg;
@@ -29,7 +31,7 @@ public class BSplineBenchmarks {
 
 //		benchmarkPaddingOptimization( flyImg, new int[]{ 64, 64, 64 }, true );
 
-		benchmarkRectangleOptimization( flyImg, true );
+		benchmarkRectangleOptimization( flyImg, false );
 
 		System.out.println("done");
 	}
@@ -42,14 +44,21 @@ public class BSplineBenchmarks {
 		ExtendedRandomAccessibleInterval<DoubleType, RandomAccessibleInterval<DoubleType>> ext = Views.extendMirrorSingle( img );
 
 		final BSplineDecomposition<DoubleType,DoubleType> coefsAlg = new BSplineDecomposition<DoubleType,DoubleType>( 3, ext );
-		coefsAlg.setDoOptimization( doOptimization );
 		
 		ArrayImg<DoubleType, DoubleArray> coefs = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
 		coefsAlg.accept( coefs );
 
 		ExtendedRandomAccessibleInterval<DoubleType, ArrayImg<DoubleType, DoubleArray>> cext = Views.extendZero( coefs );
-		BSplineCoefficientsInterpolator<DoubleType> interp = BSplineCoefficientsInterpolator.build( 
-				3, cext, new DoubleType(), doOptimization );
+
+		RealRandomAccess<DoubleType> interp;
+		if( doOptimization )
+		{
+			interp = BSplineCoefficientsInterpolator.build( 3, cext, new DoubleType(), doOptimization );
+		}
+		else
+		{
+			interp = new BSplineCoefficientsInterpolatorOld<>( cext, 3, new DoubleType(), false );
+		}
 
 
 		long[] szX2 = Arrays.stream( Intervals.dimensionsAsIntArray( img )).mapToLong( x -> 2 * x ).toArray();

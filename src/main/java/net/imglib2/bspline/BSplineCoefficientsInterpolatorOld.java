@@ -102,9 +102,15 @@ public class BSplineCoefficientsInterpolatorOld<T extends RealType<T>> extends F
 				return new RectangleShape( 1, false ); // need three samples - correct
 			case 3:
 				if( optimized )
+				{
+					System.out.println( "general shape ");
 					return new GeneralRectangleShape( 4, -1, false ); // need four samples - round up
+				}
 				else
+				{
+					System.out.println( "Old shape");
 					return new RectangleShape( 2, false ); // need four samples - round up
+				}
 			case 4:
 				return new RectangleShape( 2, false ); // need five samples - round up
 			case 5:
@@ -217,22 +223,7 @@ public class BSplineCoefficientsInterpolatorOld<T extends RealType<T>> extends F
 			for ( int d = 0; d < numDimensions(); d++ )
 			{
 
-				//final int index = ( int ) ( c.getLongPosition( d ) - target.getLongPosition( d ) + shape.getSpan() );
-//				final int index = ( int ) ( c.getLongPosition( d ) - target.getLongPosition( d ) + offset );
-
-				if( oddOrder )
-				{
-					if( target.getDoublePosition( 0 ) > position[ d ] )
-					{
-						offset = (bsplineOrder + 1 ) / 2;
-					}
-					else
-					{
-						offset = (bsplineOrder - 1 ) / 2;
-					}
-				}
-
-				final int index = ( int ) ( c.getLongPosition( d ) - target.getLongPosition( d ) + offset );
+				final int index = ( int ) ( c.getLongPosition( d ) - target.getLongPosition( d ) + shape.getSpan() );
 
 				// This check seems necessary after using too-big rectangle shape
 				if( index <  weights[d].length )
@@ -250,8 +241,8 @@ public class BSplineCoefficientsInterpolatorOld<T extends RealType<T>> extends F
 	@Override
 	public long getLongPosition(int d)
 	{
-		return (long)Math.round( position[ d ]);
-//		return (long)Math.floor( position[ d ]);
+//		return (long)Math.round( position[ d ]);
+		return (long)Math.floor( position[ d ]);
 	}
 
 	// TODO generalize for any order spline
