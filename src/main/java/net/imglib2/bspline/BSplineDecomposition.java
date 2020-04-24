@@ -215,11 +215,35 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 			while( it.hasNext() )
 			{
 				it.fwd();
-				coefAccess.setPosition( it );
-				dataAccess.setPosition( it );
 	
-				recursion1d( dataAccess, coefAccess, var,
-							itvl.dimension( d ), d );
+				for( int pole_idx = 0; pole_idx < numberOfPoles; pole_idx++ )
+				{
+					RandomAccess srcAccess;
+					RandomAccess destAccess;
+
+					if( pole_idx == 0 )
+					{
+						// do i really have to reset positions for every pole?
+						dataAccess.setPosition( it );
+						coefAccess.setPosition( it );
+
+						srcAccess = dataAccess;
+						destAccess = coefAccess;
+					}
+					else
+					{
+						// do i really have to reset positions for every pole?
+
+						srcAccess = coefExtAccess;
+						srcAccess.setPosition( it );
+
+						destAccess = coefAccess;
+						destAccess.setPosition( it );
+					}
+
+					recursion1d( srcAccess, destAccess, poles[ pole_idx ], Ci[ pole_idx ], var,
+								itvl.dimension( d ), d );
+				}
 			}
 		}
 	}
@@ -273,6 +297,8 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		return new IntervalIterator( min, max );
 	}
 
+	int debugPos = 16;
+
 	/**
 	 * Compute a 1d forward-backward recursion to compute bspline coefficients.
 	 * Stores results in the destAccess, reads data from srcAccess.
@@ -307,6 +333,7 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		for( int pole_idx = 0; pole_idx < numberOfPoles; pole_idx++ )
 		{
 			double z = poles[ pole_idx ];
+			System.out.println( "pole: " + z );
 
 			// causal recursion over coefficients
 			// initialize
@@ -325,7 +352,7 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 				coef.setReal( srcAccess.get().getRealDouble() );
 				previous.mul( z );
 				coef.add( previous );
-				
+
 				previous.set( coef );
 			}
 			// here, destAccess at position N-1
@@ -355,7 +382,6 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		}
 	}
 	
-	int debugPos = 220;
 
 	/**
 	 * Compute a 1d forward-backward recursion to compute bspline coefficients.
@@ -367,6 +393,9 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	 * It is the caller's responsibility to ensure the 
 	 * access are positioned correctly before calling.
 	 * 
+	 * See also:
+	 * Core/ImageFunction/include/itkBSplineDecompositionImageFilter.hxx
+	 * 
 	 * @param srcAccess access for the data
 	 * @param destAccess access to write results into 
 	 * @param previous a temporary variable
@@ -376,93 +405,66 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 	public <S extends RealType<S>, T extends RealType<T>> void recursion1d(
 			final RandomAccess<T> srcAccess,
 			final RandomAccess<S> destAccess,
+			final double z,
+			final double Ci,
 			final S previous,
 			final long N, 
 			final int dimension )
 	{
-		boolean debug = false;
-		for( int pole_idx = 0; pole_idx < numberOfPoles; pole_idx++ )
+//		boolean debug = false;
+
+		// causal recursion over coefficients
+		// initialize
+		double c0 = initializeCausalCoefficients( z, tolerance, dimension, srcAccess );
+		destAccess.get().setReal( c0 );
+
+		previous.set( destAccess.get() );
+
+		// recurse fwd
+		for( int i = 1; i < N; i++ )
 		{
-			double z = poles[ pole_idx ];
-
-			// causal recursion over coefficients
-			// initialize
-			double c0 = initializeCausalCoefficients( z, tolerance, dimension, srcAccess );
-			destAccess.get().setReal( c0 );
-			previous.set( destAccess.get() );
-
-			// recurse fwd
-			for( int i = 1; i < N; i++ )
-			{
-				srcAccess.fwd( dimension );
-				destAccess.fwd( dimension );
 				
-				// c[i] = v[i] + z * c[i-1]
-				S coef = destAccess.get();
-				coef.setReal( srcAccess.get().getRealDouble() );
-				previous.mul( z );
-				coef.add( previous );
-				
-				previous.set( coef );
-				
-//				if( destAccess.getIntPosition(0) == debugPos || debug )
-//				{
-//					System.out.println( "fwd coef at " + destAccess.getIntPosition(0) + " : " + coef );
-//					System.out.println( "fwd img value at " + srcAccess.getIntPosition(0) + " : " + srcAccess.get() );
-//					debug = true;
-//				}
-			}
-			// here, destAccess at position N-1
-			
-//			System.out.println( " after fwd, prev val : " + previous );
-//			System.out.println( " dest pos after fwd : " + Util.printCoordinates( destAccess ));
-			
-//			// go a little further
-//			// N 
-//			srcAccess.fwd( dimension );
-//			double plus1 = previous.getRealDouble() + z * srcAccess.get().getRealDouble();
-//
-//			// N+1
-//			srcAccess.fwd( dimension );
-//			double plus2 = plus1 + z * srcAccess.get().getRealDouble();
-//
-//			// N+2
-//			srcAccess.fwd( dimension );
-//			double plus3 = plus2 + z * srcAccess.get().getRealDouble();
-//	
-//			// initialize reverse
-//			// replaces call to initializeAntiCausalCoefficients
-//			plus3 += z * plus2;
-//			plus3 *= Ci[pole_idx];
-//
-//	
-//			// go backwards
-//			plus2 -= plus3;
-//			plus2 *= -z;
-//
-//			plus1 -= plus2;
-//			plus1 *= -z;
-//	
-//			previous.setReal( plus1 );
-			
-			previous.setReal( padOperation( srcAccess, dimension, previous.getRealDouble(), z, Ci[ pole_idx ] ));
+			srcAccess.fwd( dimension );
+			destAccess.fwd( dimension );
 
-//			System.out.println( " value after pad " + previous );
-//			System.out.println( " dest pos after pad: " + Util.printCoordinates( destAccess ));
+//			if( destAccess.getIntPosition(0) == debugPos )
+//			{
+//				System.out.println(" pos: " +  destAccess.getIntPosition( 0 ));
+//			}
+			
+			// c[i] = v[i] + z * c[i-1]
+			S coef = destAccess.get();
+			coef.setReal( srcAccess.get().getRealDouble() );
+			previous.mul( z );
+			coef.add( previous );
 
-			/*
-			 * After calling this method:
-			 *   destAccess at position N-2
-			 *   previous holds the value of coef at N-1
-			 */
-			debugPos = 227;
-			for( long i = N-1; i >= 0; i-- )
-			{
-				// coefs[ i ] = Z1 * ( coefs[i+1] - coefs[ i ]);
-				// 		      = -Z1 * ( coefs[i] - coefs[ i + 1 ]);
-				S coef = destAccess.get();
-				coef.sub( previous );
-				coef.mul( -z );
+			
+			previous.set( coef );
+			
+//			if( destAccess.getIntPosition(0) == debugPos )
+//			{
+//				System.out.println( "fwd coef at " + destAccess.getIntPosition(0) + " : " + coef );
+//				System.out.println( "fwd img value at " + srcAccess.getIntPosition(0) + " : " + srcAccess.get() );
+//				//debug = true;
+//			}
+		}
+		// here, destAccess at position N-1
+
+		previous.setReal( padOperation( srcAccess, dimension, previous.getRealDouble(), z, Ci ));
+
+		/*
+		 * After calling this method:
+		 *   destAccess at position N-2
+		 *   previous holds the value of coef at N-1
+		 */
+		debugPos = 227;
+		for( long i = N-1; i >= 0; i-- )
+		{
+			// coefs[ i ] = Z1 * ( coefs[i+1] - coefs[ i ]);
+			// 		      = -Z1 * ( coefs[i] - coefs[ i + 1 ]);
+			S coef = destAccess.get();
+			coef.sub( previous );
+			coef.mul( -z );
 
 //				if( destAccess.getIntPosition(0) == debugPos || debug )
 //				{
@@ -470,12 +472,14 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 //					debug = true;
 //				}
 
-				previous.set( coef );
+			previous.set( coef );
 
-				srcAccess.bck( dimension );
-				destAccess.bck( dimension );
-			}
+			srcAccess.bck( dimension );
+			destAccess.bck( dimension );
 		}
+
+		// TODO may need to back things up to make sure we're in the right place
+
 	}
 
 	private < R extends RealType<R>> double padOperation( RandomAccess< R > access, int dimension, double last, double z, double Ci )
