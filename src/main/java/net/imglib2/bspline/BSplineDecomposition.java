@@ -114,10 +114,21 @@ public class BSplineDecomposition<T extends RealType<T>, S extends RealType<S>> 
 		return Ci;
 	}
 
+	public static double gainFromPoles( double[] poles )
+	{
+		double c0 = 1;
+		// Compute over all gain
+		for (int k = 0; k < poles.length; k++)
+		{
+			// Note for cubic splines lambda = 6
+			c0 = c0 * (1.0 - poles[k]) * ( 1.0 - ( 1.0 / poles[k] ));
+		}
+		return c0;
+	}
+
 	@Override
 	public void accept( final RandomAccessibleInterval< S > coefficients )
 	{
-
 		if( isPadded )
 		{
 			originalInterval = coefficients;
