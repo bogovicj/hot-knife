@@ -141,9 +141,9 @@ public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S ext
 		ExtendedRandomAccessibleInterval<S, RandomAccessibleInterval<S>> coefExt = Views.extendZero( coefficients );
 		S type = Util.getTypeFromInterval( coefficients );
 		if( order % 2 == 0 )
-			return new BSplineCoefficientsInterpolatorEven<S>( order, coefExt, type, true );
+			return new BSplineCoefficientsInterpolatorEven<S>( order, coefExt, type.copy(), true );
 		else
-			return new BSplineCoefficientsInterpolatorOdd<S>( order, coefExt, type, true );
+			return new BSplineCoefficientsInterpolatorOdd<S>( order, coefExt, type.copy(), true );
 
 		// TODO generalize extension
 	}

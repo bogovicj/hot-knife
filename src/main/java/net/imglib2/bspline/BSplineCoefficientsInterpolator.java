@@ -126,7 +126,6 @@ public interface BSplineCoefficientsInterpolator<T extends RealType<T>> extends 
 			case 5:
 				if( optimized )
 				{
-					System.out.println("GeneralRectangleShape 6, -2" );
 					return new GeneralRectangleShape( 6, -2, false ); // need four samples - round up
 				}
 				else
