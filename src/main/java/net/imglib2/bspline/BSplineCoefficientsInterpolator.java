@@ -114,13 +114,25 @@ public interface BSplineCoefficientsInterpolator<T extends RealType<T>> extends 
 				return new RectangleShape( 1, false ); // need three samples - correct
 			case 3:
 				if( optimized )
+				{
 					return new GeneralRectangleShape( 4, -1, false ); // need four samples - round up
+				}
 				else
+				{
 					return new RectangleShape( 2, false ); // need four samples - round up
+				}
 			case 4:
 				return new RectangleShape( 2, false ); // need five samples - round up
 			case 5:
-				return new RectangleShape( 3, false ); // need six samples - round up
+				if( optimized )
+				{
+					System.out.println("GeneralRectangleShape 6, -2" );
+					return new GeneralRectangleShape( 6, -2, false ); // need four samples - round up
+				}
+				else
+				{
+					return new RectangleShape( 3, false ); // need six samples - round up
+				}
 			default:
 				return null;
 		}

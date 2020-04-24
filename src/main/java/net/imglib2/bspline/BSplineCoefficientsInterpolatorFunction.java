@@ -83,7 +83,7 @@ public class BSplineCoefficientsInterpolatorFunction<T extends RealType<T>>
 	boolean DEBUG = false;
 
 
-	public BSplineCoefficientsInterpolatorFunction( final BSplineCoefficientsInterpolatorFunction< T > interpolator, final int order, final T type, 
+	private BSplineCoefficientsInterpolatorFunction( final BSplineCoefficientsInterpolatorFunction< T > interpolator, final int order, final T type, 
 			final boolean optimized )
 	{
 		this.bsplineOrder = interpolator.bsplineOrder;
@@ -212,7 +212,7 @@ public class BSplineCoefficientsInterpolatorFunction<T extends RealType<T>>
 			case 4:
 				return new BsplineKernel4();
 			case 5:
-				return null; // TODO
+				return new BsplineKernel5();
 			default:
 				return null;
 		}
