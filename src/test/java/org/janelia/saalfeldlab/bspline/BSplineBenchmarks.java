@@ -36,50 +36,55 @@ public class BSplineBenchmarks {
 		System.out.println("done");
 	}
 
+	/**
+	 * Deprecated - look at an older commit 
+	 * 
+	 * @deprecated
+	 */
 	public static void benchmarkRectangleOptimization(
 			final RandomAccessibleInterval<DoubleType> img,
 			final boolean doOptimization )
 	{
 
-		ExtendedRandomAccessibleInterval<DoubleType, RandomAccessibleInterval<DoubleType>> ext = Views.extendMirrorSingle( img );
-
-		final BSplineDecomposition<DoubleType,DoubleType> coefsAlg = new BSplineDecomposition<DoubleType,DoubleType>( 3, ext );
-		
-		ArrayImg<DoubleType, DoubleArray> coefs = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
-		coefsAlg.accept( coefs );
-
-		ExtendedRandomAccessibleInterval<DoubleType, ArrayImg<DoubleType, DoubleArray>> cext = Views.extendZero( coefs );
-
-		RealRandomAccess<DoubleType> interp;
-		if( doOptimization )
-		{
-			interp = BSplineCoefficientsInterpolator.build( 3, cext, new DoubleType(), doOptimization );
-		}
-		else
-		{
-			interp = new BSplineCoefficientsInterpolatorOld<>( cext, 3, new DoubleType(), false );
-		}
-
-
-		long[] szX2 = Arrays.stream( Intervals.dimensionsAsIntArray( img )).mapToLong( x -> 2 * x ).toArray();
-		ArrayImg<DoubleType, DoubleArray> imgUp = ArrayImgs.doubles(szX2 );
-		
-		Scale3D xfm = new Scale3D( 0.5, 0.5, 0.5 );
-		
-	
-		RealPoint p = new RealPoint( 3 );
-		ArrayCursor<DoubleType> c = imgUp.cursor();
-		
-		long startTime = System.currentTimeMillis();
-		while( c.hasNext() )
-		{
-			c.fwd();
-			xfm.apply( c, p );
-			interp.setPosition( p );
-			c.get().set( interp.get() );
-		}
-		long endTime = System.currentTimeMillis();
-		System.out.println( "took: " + (endTime-startTime) + " ms" );
+//		ExtendedRandomAccessibleInterval<DoubleType, RandomAccessibleInterval<DoubleType>> ext = Views.extendMirrorSingle( img );
+//
+//		final BSplineDecomposition<DoubleType,DoubleType> coefsAlg = new BSplineDecomposition<DoubleType,DoubleType>( 3, ext );
+//		
+//		ArrayImg<DoubleType, DoubleArray> coefs = ArrayImgs.doubles( Intervals.dimensionsAsLongArray( img ));
+//		coefsAlg.accept( coefs );
+//
+//		ExtendedRandomAccessibleInterval<DoubleType, ArrayImg<DoubleType, DoubleArray>> cext = Views.extendZero( coefs );
+//
+//		RealRandomAccess<DoubleType> interp;
+//		if( doOptimization )
+//		{
+//			interp = BSplineCoefficientsInterpolator.build( 3, cext, new DoubleType(), doOptimization );
+//		}
+//		else
+//		{
+//			interp = new BSplineCoefficientsInterpolatorOld<>( cext, 3, new DoubleType(), false );
+//		}
+//
+//
+//		long[] szX2 = Arrays.stream( Intervals.dimensionsAsIntArray( img )).mapToLong( x -> 2 * x ).toArray();
+//		ArrayImg<DoubleType, DoubleArray> imgUp = ArrayImgs.doubles(szX2 );
+//		
+//		Scale3D xfm = new Scale3D( 0.5, 0.5, 0.5 );
+//		
+//	
+//		RealPoint p = new RealPoint( 3 );
+//		ArrayCursor<DoubleType> c = imgUp.cursor();
+//		
+//		long startTime = System.currentTimeMillis();
+//		while( c.hasNext() )
+//		{
+//			c.fwd();
+//			xfm.apply( c, p );
+//			interp.setPosition( p );
+//			c.get().set( interp.get() );
+//		}
+//		long endTime = System.currentTimeMillis();
+//		System.out.println( "took: " + (endTime-startTime) + " ms" );
 
 
 	}

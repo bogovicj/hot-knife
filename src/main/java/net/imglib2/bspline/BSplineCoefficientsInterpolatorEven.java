@@ -68,31 +68,26 @@ public class BSplineCoefficientsInterpolatorEven<T extends RealType<T>> extends 
 		assert( order % 2 == 0 );
 		
 		this.bsplineOrder = interpolator.bsplineOrder;
-		this.shape = BSplineCoefficientsInterpolator.shapeFromOrder( bsplineOrder, optimized );
-		kernel = new BSplineCoefficientsInterpolatorFunction<>( order, target, this, type, optimized );
+		this.shape = BSplineCoefficientsInterpolator.shapeFromOrder( bsplineOrder  );
+		kernel = new BSplineCoefficientsInterpolatorFunction<>( order, target, this, type );
 	}
 
 	public BSplineCoefficientsInterpolatorEven( final int order, final RandomAccessible< T > coefficients, final T type )
 	{
-		this( order, coefficients, type, true );
-	}
-
-	public BSplineCoefficientsInterpolatorEven( final int order, final RandomAccessible< T > coefficients, final T type, boolean optimized )
-	{
-		this( order, coefficients, type, BSplineCoefficientsInterpolator.shapeFromOrder( order, optimized ), optimized );
+		this( order, coefficients, type, BSplineCoefficientsInterpolator.shapeFromOrder( order ));
 	}
 
 	private BSplineCoefficientsInterpolatorEven( 
 			final int order, 
 			final RandomAccessible< T > coefficients, final T type, 
-			final RectangleShape shape, final boolean optimized )
+			final RectangleShape shape )
 	{
 		super( shape.neighborhoodsRandomAccessible( coefficients ).randomAccess() );
 		assert( order % 2 == 0 );
 
 		this.shape = shape;
 		this.bsplineOrder = order;
-		kernel = new BSplineCoefficientsInterpolatorFunction<>( order, target, this, type, optimized );
+		kernel = new BSplineCoefficientsInterpolatorFunction<>( order, target, this, type );
 	}
 
 	@Override

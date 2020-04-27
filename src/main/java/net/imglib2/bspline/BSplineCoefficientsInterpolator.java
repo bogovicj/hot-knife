@@ -57,18 +57,9 @@ public interface BSplineCoefficientsInterpolator<T extends RealType<T>> extends 
 		final int order, final RandomAccessible< S > coefficients, final S type )
 	{
 		if( order % 2 == 0 )
-			return new BSplineCoefficientsInterpolatorEven<S>( order, coefficients, type, true );
+			return new BSplineCoefficientsInterpolatorEven<S>( order, coefficients, type );
 		else
-			return new BSplineCoefficientsInterpolatorOdd<S>( order, coefficients, type, true );
-	}
-
-	public static <S extends RealType<S>> BSplineCoefficientsInterpolator<S> build(
-		final int order, final RandomAccessible< S > coefficients, final S type, boolean optimized )
-	{
-		if( order % 2 == 0 )
-			return new BSplineCoefficientsInterpolatorEven<S>( order, coefficients, type, optimized );
-		else
-			return new BSplineCoefficientsInterpolatorOdd<S>( order, coefficients, type, optimized );
+			return new BSplineCoefficientsInterpolatorOdd<S>( order, coefficients, type );
 	}
 	
 	@Override
@@ -101,7 +92,7 @@ public interface BSplineCoefficientsInterpolator<T extends RealType<T>> extends 
 	 * 
 	 * @return an appropriate rectangle 
 	 */
-	public static RectangleShape shapeFromOrder( int bsplineOrder, boolean optimized )
+	public static RectangleShape shapeFromOrder( int bsplineOrder )
 	{
 		assert( bsplineOrder <= 5  && bsplineOrder >= 0 );
 
@@ -113,25 +104,11 @@ public interface BSplineCoefficientsInterpolator<T extends RealType<T>> extends 
 			case 2: 
 				return new RectangleShape( 1, false ); // need three samples - correct
 			case 3:
-				if( optimized )
-				{
-					return new GeneralRectangleShape( 4, -1, false ); // need four samples - round up
-				}
-				else
-				{
-					return new RectangleShape( 2, false ); // need four samples - round up
-				}
+				return new GeneralRectangleShape( 4, -1, false ); // need four samples - round up
 			case 4:
 				return new RectangleShape( 2, false ); // need five samples - round up
 			case 5:
-				if( optimized )
-				{
-					return new GeneralRectangleShape( 6, -2, false ); // need four samples - round up
-				}
-				else
-				{
-					return new RectangleShape( 3, false ); // need six samples - round up
-				}
+				return new GeneralRectangleShape( 6, -2, false ); // need four samples - round up
 			default:
 				return null;
 		}

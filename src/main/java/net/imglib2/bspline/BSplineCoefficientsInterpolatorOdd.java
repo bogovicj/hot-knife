@@ -58,39 +58,28 @@ public class BSplineCoefficientsInterpolatorOdd<T extends RealType<T>> extends F
 
 	private BSplineCoefficientsInterpolatorOdd( final BSplineCoefficientsInterpolatorOdd< T > interpolator, final int order, final T type )
 	{
-		this( interpolator, order, type, true );
-	}
-
-	private BSplineCoefficientsInterpolatorOdd( final BSplineCoefficientsInterpolatorOdd< T > interpolator, final int order, final T type, 
-			final boolean optimized )
-	{
 		super( interpolator.target.copyRandomAccess() );
 		assert( order % 2 == 1 );
 		
 		this.bsplineOrder = interpolator.bsplineOrder;
-		this.shape = BSplineCoefficientsInterpolator.shapeFromOrder( bsplineOrder, optimized );
-		kernel = new BSplineCoefficientsInterpolatorFunction<>( order, target, this, type, optimized );
-	}
-
-	public BSplineCoefficientsInterpolatorOdd( final int order, final RandomAccessible< T > coefficients, final T type )
-	{
-		this( order, coefficients, type, true );
-	}
-
-	public BSplineCoefficientsInterpolatorOdd( final int order, final RandomAccessible< T > coefficients, final T type, boolean optimized )
-	{
-		this( order, coefficients, type, BSplineCoefficientsInterpolator.shapeFromOrder( order, optimized ), optimized );
+		this.shape = BSplineCoefficientsInterpolator.shapeFromOrder( bsplineOrder );
+		kernel = new BSplineCoefficientsInterpolatorFunction<>( order, target, this, type );
 	}
 
 	private BSplineCoefficientsInterpolatorOdd( final int order, final RandomAccessible< T > coefficients, final T type, 
-			final RectangleShape shape, final boolean optimized )
+			final RectangleShape shape )
 	{
 		super( shape.neighborhoodsRandomAccessible( coefficients ).randomAccess() );
 		assert( order % 2 == 1 );
 
 		this.shape = shape;
 		this.bsplineOrder = order;
-		kernel = new BSplineCoefficientsInterpolatorFunction<>( order, target, this, type, optimized );
+		kernel = new BSplineCoefficientsInterpolatorFunction<>( order, target, this, type );
+	}
+
+	public BSplineCoefficientsInterpolatorOdd( final int order, final RandomAccessible< T > coefficients, final T type )
+	{
+		this( order, coefficients, type, BSplineCoefficientsInterpolator.shapeFromOrder( order ));
 	}
 
 	@Override
