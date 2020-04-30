@@ -48,13 +48,12 @@ public class BSplineCoefCorrectnessTest
 
 		coefItvl1d = new FinalInterval( new long[]{ 32 });
 		testItvl1d = new FinalInterval( new long[]{ 12 }, new long[]{ 18 });
-
 	}
 
 	@Test
 	public void testSplines1d()
 	{
-		final double delta = 1e-6;
+		final double delta = 1e-4;
 
 		// order two bspline
 		runTest1d( 2, const1d, "constant", coefItvl1d, testItvl1d, delta );
@@ -73,11 +72,11 @@ public class BSplineCoefCorrectnessTest
 		runTest1d( 4, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
 		runTest1d( 4, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
 
-//		// order five bspline
-//		runTest1d( 5, const1d, "constant", coefItvl1d, testItvl1d, delta );
-//		runTest1d( 5, linear1d, "linear", coefItvl1d, testItvl1d, delta );
-//		runTest1d( 5, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
-//		runTest1d( 5, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
+		// order five bspline
+		runTest1d( 5, const1d, "constant", coefItvl1d, testItvl1d, delta );
+		runTest1d( 5, linear1d, "linear", coefItvl1d, testItvl1d, delta );
+		runTest1d( 5, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
+		runTest1d( 5, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
