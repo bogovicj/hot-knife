@@ -7,13 +7,14 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
+import bdv.util.BdvFunctions;
 import net.imglib2.FinalInterval;
 import net.imglib2.Interval;
 import net.imglib2.Localizable;
 import net.imglib2.Point;
 import net.imglib2.RandomAccessible;
-import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.RealLocalizable;
+import net.imglib2.RealPoint;
 import net.imglib2.RealRandomAccess;
 import net.imglib2.RealRandomAccessible;
 import net.imglib2.bspline.BSplineCoefficientsInterpolator;
@@ -24,63 +25,136 @@ import net.imglib2.position.FunctionRealRandomAccessible;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
 import net.imglib2.util.ConstantUtils;
-import net.imglib2.view.RandomAccessibleOnRealRandomAccessible;
 import net.imglib2.view.Views;
 
 public class BSplineCoefCorrectnessTest
 {
+
+	// 1d
+	Interval coefItvl1d;
+	Interval testItvl1d;;
 
 	RealRandomAccessible<DoubleType> const1d;
 	RealRandomAccessible<DoubleType> linear1d;
 	RealRandomAccessible<DoubleType> quadratic1d;
 	RealRandomAccessible<DoubleType> cubic1d;
 	RealRandomAccessible<DoubleType> quartic1d;
-	Interval coefItvl1d;
-	Interval testItvl1d;;
 
+	// 2d
+	Interval coefItvl2d;
+	Interval testItvl2d;;
+
+	RealRandomAccessible<DoubleType> const2d;
+	RealRandomAccessible<DoubleType> linear2d;
+	RealRandomAccessible<DoubleType> quadratic2d;
+	RealRandomAccessible<DoubleType> cubic2d;
+	RealRandomAccessible<DoubleType> quartic2d;
+	
+	public static void main( String[] args )
+	{
+		
+		BSplineCoefCorrectnessTest obj = new BSplineCoefCorrectnessTest();
+		obj.setup();
+
+		FinalInterval interval = new FinalInterval( 32, 32 );
+
+
+//		BdvFunctions.show( obj.linear2d , interval, "linear" );
+//		BdvFunctions.show( obj.quadratic2d , interval, "quadratic" );
+		BdvFunctions.show( obj.cubic2d , interval, "cubic" );
+	}
+
+	@SuppressWarnings("unchecked")
 	@Before
 	public void setup()
 	{
+		coefItvl1d = new FinalInterval( new long[]{ 64 });
+		testItvl1d = new FinalInterval( new long[]{ 28 }, new long[]{ 36 });
+
 		const1d = ConstantUtils.constantRealRandomAccessible( new DoubleType( 1 ), 1 );
 		linear1d = polynomialReal1dC( new double[]{ 1, 2 } );
-		quadratic1d = polynomialReal1dZ( new double[]{ 14, 16 } );
-		cubic1d = polynomialReal1dZ( new double[]{ 14, 15, 16 } );
+		quadratic1d = polynomialReal1dZ( 1, new double[]{ 31, 33 } );
+		cubic1d = polynomialReal1dZ( 1, new double[]{ 31, 32, 33 } );
 
-		coefItvl1d = new FinalInterval( new long[]{ 32 });
-		testItvl1d = new FinalInterval( new long[]{ 12 }, new long[]{ 18 });
+
+		coefItvl2d = new FinalInterval( new long[]{ 64, 64 });
+		testItvl2d = new FinalInterval( new long[]{ 28, 28 }, new long[]{ 36, 36 });
+
+		const2d = ConstantUtils.constantRealRandomAccessible( new DoubleType( 1 ), 2 );
+
+		linear2d = separableImageReal( new DoubleType(), 
+					polynomial1dC( new double[]{ 1, 2 }), 
+					polynomial1dC( new double[]{ -10, -2 }));
+
+		quadratic2d = separableImageReal( new DoubleType(), 
+						polynomial1dZ( 1, new double[]{ 31, 33 } ),
+						polynomial1dZ( -1, new double[]{ 31, 33 } ));
+
+		cubic2d = separableImageReal( new DoubleType(), 
+						polynomial1dZ( 1, new double[]{ 31, 32, 33 } ),
+						polynomial1dZ( -1, new double[]{ 31, 32, 33 } ));
 	}
 
 	@Test
 	public void testSplines1d()
 	{
-		final double delta = 1e-4;
+		final double delta = 1e-6;
 
 		// order two bspline
-		runTest1d( 2, const1d, "constant", coefItvl1d, testItvl1d, delta );
-		runTest1d( 2, linear1d, "linear", coefItvl1d, testItvl1d, delta );
-		runTest1d( 2, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
+		runTest( 2, const1d, "constant", coefItvl1d, testItvl1d, delta );
+		runTest( 2, linear1d, "linear", coefItvl1d, testItvl1d, delta );
+		runTest( 2, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
 
 		// order three bspline
-		runTest1d( 3, const1d, "constant", coefItvl1d, testItvl1d, delta );
-		runTest1d( 3, linear1d, "linear", coefItvl1d, testItvl1d, delta );
-		runTest1d( 3, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
-		runTest1d( 3, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
+		runTest( 3, const1d, "constant", coefItvl1d, testItvl1d, delta );
+		runTest( 3, linear1d, "linear", coefItvl1d, testItvl1d, delta );
+		runTest( 3, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
+		runTest( 3, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
 
 		// order four bspline
-		runTest1d( 4, const1d, "constant", coefItvl1d, testItvl1d, delta );
-		runTest1d( 4, linear1d, "linear", coefItvl1d, testItvl1d, delta );
-		runTest1d( 4, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
-		runTest1d( 4, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
+		runTest( 4, const1d, "constant", coefItvl1d, testItvl1d, delta );
+		runTest( 4, linear1d, "linear", coefItvl1d, testItvl1d, delta );
+		runTest( 4, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
+		runTest( 4, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
 
 		// order five bspline
-		runTest1d( 5, const1d, "constant", coefItvl1d, testItvl1d, delta );
-		runTest1d( 5, linear1d, "linear", coefItvl1d, testItvl1d, delta );
-		runTest1d( 5, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
-		runTest1d( 5, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
+		runTest( 5, const1d, "constant", coefItvl1d, testItvl1d, delta );
+		runTest( 5, linear1d, "linear", coefItvl1d, testItvl1d, delta );
+		runTest( 5, quadratic1d, "quadratic", coefItvl1d, testItvl1d, delta );
+		runTest( 5, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
+	}
+
+	@Test
+	public void testSplines2d()
+	{
+		final double delta = 1e-6;
+
+		// order two bspline
+		runTest( 2, const2d, "constant", coefItvl2d, testItvl2d, delta );
+		runTest( 2, linear2d, "linear", coefItvl2d, testItvl2d, delta );
+		runTest( 2, quadratic2d, "quadratic", coefItvl2d, testItvl2d, delta );
+
+		// order three bspline
+		runTest( 3, const2d, "constant", coefItvl2d, testItvl2d, delta );
+		runTest( 3, linear2d, "linear", coefItvl2d, testItvl2d, delta );
+		runTest( 3, quadratic2d, "quadratic", coefItvl2d, testItvl2d, delta );
+		runTest( 3, cubic2d, "cubic", coefItvl2d, testItvl2d, delta );
+
+		// order four bspline
+		runTest( 4, const2d, "constant", coefItvl2d, testItvl2d, delta );
+		runTest( 4, linear2d, "linear", coefItvl2d, testItvl2d, delta );
+		runTest( 4, quadratic2d, "quadratic", coefItvl2d, testItvl2d, delta );
+		runTest( 4, cubic2d, "cubic", coefItvl2d, testItvl2d, delta );
+
+		// order five bspline
+		runTest( 5, const2d, "constant", coefItvl2d, testItvl2d, delta );
+		runTest( 5, linear2d, "linear", coefItvl2d, testItvl2d, delta );
+		runTest( 5, quadratic2d, "quadratic", coefItvl2d, testItvl2d, delta );
+		runTest( 5, cubic2d, "cubic", coefItvl2d, testItvl2d, delta );
 	}
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
-	public static <T extends RealType<T>> void runTest1d( 
+	public static <T extends RealType<T>> void runTest( 
 			final int order, 
 			final RealRandomAccessible<T> realImg, 
 			final String baseMessage,
@@ -88,6 +162,10 @@ public class BSplineCoefCorrectnessTest
 			final Interval testInterval, 
 			final double delta )
 	{
+		assert( realImg.numDimensions() == coefInterval.numDimensions() && 
+				coefInterval.numDimensions() == testInterval.numDimensions() );
+
+		final int nd = realImg.numDimensions();
 		RandomAccessible<T> img = Views.raster( realImg );
 		BSplineCoefficientsInterpolator<DoubleType> est = new BSplineCoefficientsInterpolatorFactory( img, coefInterval, order ).create( img );
 
@@ -96,15 +174,48 @@ public class BSplineCoefCorrectnessTest
 		while( it.hasNext() )
 		{
 			it.fwd();
-
-			trueRa.setPosition( it.getDoublePosition( 0 ) + 0.5, 0 );
-			est.setPosition( it.getDoublePosition( 0 ) + 0.5, 0 );
+			for( int d = 0; d < nd; d++ )
+			{
+				trueRa.setPosition( it.getDoublePosition( d ) + 0.5, d );
+				est.setPosition( it.getDoublePosition( d ) + 0.5, d );
+			}
 
 			Assert.assertEquals(String.format("%s : order %d spline at %f", baseMessage, order, it.getDoublePosition(0)),
 					trueRa.get().getRealDouble(), 
 					est.get().getRealDouble(),
 					delta );
 		}
+	}
+
+	public static <T extends RealType<T>> RealRandomAccessible<T> separableImageReal( final T t, final BiConsumer<RealLocalizable,T>... funs1d )
+	{
+		BiConsumer<RealLocalizable, T> f = new BiConsumer<RealLocalizable,T>()
+		{
+			@Override
+			public void accept( RealLocalizable l, T t )
+			{
+				T tmp = t.createVariable();
+				t.setOne();
+				final RealPoint p = new RealPoint( 1 );
+
+				for( int i = 0; i < funs1d.length; i++ )
+				{
+					p.setPosition( l.getDoublePosition( i ) , 0 );
+					funs1d[ i ].accept( p , tmp );
+					t.mul( tmp );
+				}
+			}
+		};
+
+		Supplier<T> s = new Supplier<T>()
+		{
+			@Override
+			public T get() {
+				return t.createVariable();
+			}
+		};
+
+		return new FunctionRealRandomAccessible<T>( funs1d.length, f, s );
 	}
 
 	public static <T extends RealType<T>> RandomAccessible<T> separableImage( final T t, final BiConsumer<Localizable,T>... funs1d )
@@ -115,8 +226,9 @@ public class BSplineCoefCorrectnessTest
 			public void accept( Localizable l, T t )
 			{
 				T tmp = t.createVariable();
-				Point p = new Point( 1 );
 				t.setOne();
+				final Point p = new Point( 1 );
+
 				for( int i = 0; i < funs1d.length; i++ )
 				{
 					p.setPosition( l.getIntPosition( i ), 0 );
@@ -134,7 +246,7 @@ public class BSplineCoefCorrectnessTest
 			}
 		};
 
-		return new FunctionRandomAccessible<T>( 3, f, s );
+		return new FunctionRandomAccessible<T>( funs1d.length, f, s );
 	}
 
 	public static RandomAccessible<DoubleType> polynomialImg1dC( final double[] coefs )
@@ -147,12 +259,12 @@ public class BSplineCoefCorrectnessTest
 		return new FunctionRealRandomAccessible<>( 1, polynomial1dC( coefs ), DoubleType::new );
 	}
 
-	public static RealRandomAccessible<DoubleType> polynomialReal1dZ( final double[] coefs )
+	public static RealRandomAccessible<DoubleType> polynomialReal1dZ( final double scale, final double[] zeros )
 	{
-		return new FunctionRealRandomAccessible<>( 1, polynomial1dZ( coefs ), DoubleType::new );
+		return new FunctionRealRandomAccessible<>( 1, polynomial1dZ( scale, zeros ), DoubleType::new );
 	}
 
-	public static BiConsumer< RealLocalizable, DoubleType > polynomial1dZ( final double[] zeros )
+	public static BiConsumer< RealLocalizable, DoubleType > polynomial1dZ( final double scale, final double[] zeros )
 	{
 		return new BiConsumer<RealLocalizable, DoubleType >()
 			{
@@ -171,7 +283,7 @@ public class BSplineCoefCorrectnessTest
 						}
 						total += term;
 					}
-					v.set( total );
+					v.set( scale * total );
 				}
 			};
 	}
