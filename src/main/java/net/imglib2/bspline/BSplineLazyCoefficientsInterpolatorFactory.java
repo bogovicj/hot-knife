@@ -90,7 +90,7 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 		this.blockSize = blockSize;
 		this.coefficientType = coefficientType;
 		
-		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( Views.interval( img, interval) );
+		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( img );
 		LazyCellImgFactory<T,S> factory = new LazyCellImgFactory<T,S>( decomp, interval, blockSize, coefficientType );
 		coefficientStorage = factory.create( interval );
 		coefficientAccess = Views.extendZero( coefficientStorage );
@@ -171,6 +171,7 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 
 		public LazyCellImgFactory( final int order, final RandomAccessibleInterval<T> img, final int[] blockSize, final S type )
 		{
+			super( type );
 			this.blockSize = blockSize;
 			this.type = type;
 			this.interval = img;
@@ -180,6 +181,7 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 		public LazyCellImgFactory( final BSplineDecomposition<T,S> decomposition, final Interval interval, 
 				final int[] blockSize, final S type )
 		{
+			super( type );
 			this.blockSize = blockSize;
 			this.type = type;
 			this.interval = interval;
