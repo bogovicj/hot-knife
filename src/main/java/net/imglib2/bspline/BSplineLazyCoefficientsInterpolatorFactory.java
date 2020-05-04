@@ -34,8 +34,11 @@
 
 package net.imglib2.bspline;
 
+import java.util.Arrays;
+
 import org.janelia.saalfeldlab.hotknife.util.Lazy;
 
+import net.imglib2.FinalInterval;
 import net.imglib2.Interval;
 import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
@@ -50,6 +53,7 @@ import net.imglib2.type.NativeType;
 import net.imglib2.type.Type;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
+import net.imglib2.util.Intervals;
 import net.imglib2.util.Util;
 import net.imglib2.view.Views;
 
@@ -89,11 +93,44 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 		this.interval = interval;
 		this.blockSize = blockSize;
 		this.coefficientType = coefficientType;
-		
+
+		long[] min = Intervals.minAsLongArray( interval );
+		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( Views.translateInverse( img, min ));
+		LazyCellImgFactory<T,S> factory = new LazyCellImgFactory<T,S>( decomp, interval, blockSize, coefficientType );
+
+		if( Arrays.stream( min ).allMatch( x -> x == 0 ) )
+		{
+			coefficientStorage = factory.create( interval );
+		}
+		else
+		{
+			Img<S> coefficientsBase = factory.create( interval );
+			coefficientStorage = Views.translate( coefficientsBase, min );
+		}
+
+		coefficientAccess = Views.extendZero( coefficientStorage );
+	}
+
+	public BSplineLazyCoefficientsInterpolatorFactory( final RandomAccessible<T> img,
+			final int order, final boolean clipping, S coefficientType,
+			final int[] blockSize )
+	{
+//		System.out.println("INFINITE LAZY BSPLINE");
+
+		this.order = order;
+		this.clipping = clipping;
+
+		long[] max = new long[ img.numDimensions() ];
+		Arrays.fill( max, Long.MAX_VALUE / 2 );
+
+		this.interval = new FinalInterval( max );
+		this.blockSize = blockSize;
+		this.coefficientType = coefficientType;
+
 		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( img );
+
 		LazyCellImgFactory<T,S> factory = new LazyCellImgFactory<T,S>( decomp, interval, blockSize, coefficientType );
 		coefficientStorage = factory.create( interval );
-		coefficientAccess = Views.extendZero( coefficientStorage );
 	}
 
 	@SuppressWarnings("unchecked")

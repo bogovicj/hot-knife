@@ -33,16 +33,20 @@
  */
 package net.imglib2.bspline;
 
+import java.util.Arrays;
+
 import net.imglib2.Interval;
 import net.imglib2.RandomAccessible;
 import net.imglib2.RandomAccessibleInterval;
 import net.imglib2.RealInterval;
 import net.imglib2.RealRandomAccess;
+import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
 import net.imglib2.interpolation.InterpolatorFactory;
 import net.imglib2.type.Type;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
+import net.imglib2.util.Intervals;
 import net.imglib2.util.Util;
 import net.imglib2.view.ExtendedRandomAccessibleInterval;
 import net.imglib2.view.Views;
@@ -80,7 +84,18 @@ public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S ext
 		this.clipping = clipping;
 
 		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( order, img );
-		coefficients = coefficientFactory.create( interval );
+
+		long[] min = Intervals.minAsLongArray( interval );
+		if( Arrays.stream( min ).allMatch( x -> x == 0 ) )
+		{
+			coefficients = coefficientFactory.create( interval );
+		}
+		else
+		{
+			Img<S> coefficientsBase = coefficientFactory.create( interval );
+			coefficients = Views.translate( coefficientsBase, min );
+		}
+
 		decomp.accept( coefficients );
 	}
 
