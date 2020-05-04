@@ -115,22 +115,27 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 			final int order, final boolean clipping, S coefficientType,
 			final int[] blockSize )
 	{
-//		System.out.println("INFINITE LAZY BSPLINE");
-
 		this.order = order;
 		this.clipping = clipping;
-
-		long[] max = new long[ img.numDimensions() ];
-		Arrays.fill( max, Long.MAX_VALUE / 2 );
-
-		this.interval = new FinalInterval( max );
 		this.blockSize = blockSize;
 		this.coefficientType = coefficientType;
 
-		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( img );
+		// TODO how big can we make this?
+		long[] min = new long[ img.numDimensions() ];
+		Arrays.fill( min, -Integer.MAX_VALUE / 1000 );
 
+		long[] max = new long[ img.numDimensions() ];
+		Arrays.fill( max, Integer.MAX_VALUE / 1000 );
+
+		this.interval = new FinalInterval( min, max );
+
+		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( Views.translateInverse( img, min ));
 		LazyCellImgFactory<T,S> factory = new LazyCellImgFactory<T,S>( decomp, interval, blockSize, coefficientType );
-		coefficientStorage = factory.create( interval );
+
+		Img<S> coefficientsBase = factory.create( interval );
+		coefficientStorage = Views.translate( coefficientsBase, min );
+
+		coefficientAccess = Views.extendZero( coefficientStorage );
 	}
 
 	@SuppressWarnings("unchecked")
