@@ -49,12 +49,17 @@ import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
 import net.imglib2.img.basictypeaccess.AccessFlags;
 import net.imglib2.interpolation.InterpolatorFactory;
+import net.imglib2.outofbounds.OutOfBoundsConstantValue;
+import net.imglib2.outofbounds.OutOfBoundsConstantValueFactory;
+import net.imglib2.outofbounds.OutOfBoundsFactory;
 import net.imglib2.type.NativeType;
 import net.imglib2.type.Type;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
 import net.imglib2.util.Intervals;
 import net.imglib2.util.Util;
+import net.imglib2.view.ExtendedRandomAccessibleInterval;
+import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 
 public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S extends RealType<S> & NativeType<S>> implements InterpolatorFactory< S, RandomAccessible< T > >
@@ -71,6 +76,8 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 	
 	protected S coefficientType;
 	
+	protected final OutOfBoundsFactory<?,?> oobFactory;
+
 	protected int[] blockSize;
 
 	/**
@@ -86,16 +93,22 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 	 */
 	public BSplineLazyCoefficientsInterpolatorFactory( final RandomAccessible<T> img, final Interval interval, 
 			final int order, final boolean clipping, S coefficientType,
-			final int[] blockSize )
+			final int[] blockSize, final OutOfBoundsFactory<?,?> oobFactory )
 	{
 		this.order = order;
 		this.clipping = clipping;
 		this.interval = interval;
 		this.blockSize = blockSize;
 		this.coefficientType = coefficientType;
+		this.oobFactory = oobFactory;
+
+		@SuppressWarnings("unchecked")
+		ExtendedRandomAccessibleInterval<T, IntervalView<T>> extendedImg = Views.extend( 
+				Views.interval( img, interval ), 
+				((OutOfBoundsFactory<T,RandomAccessibleInterval<T>>)oobFactory));
 
 		long[] min = Intervals.minAsLongArray( interval );
-		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( Views.translateInverse( img, min ));
+		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( Views.translateInverse( extendedImg, min ));
 		LazyCellImgFactory<T,S> factory = new LazyCellImgFactory<T,S>( decomp, interval, blockSize, coefficientType );
 
 		if( Arrays.stream( min ).allMatch( x -> x == 0 ) )
@@ -108,17 +121,26 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 			coefficientStorage = Views.translate( coefficientsBase, min );
 		}
 
-		coefficientAccess = Views.extendZero( coefficientStorage );
+		coefficientAccess = Views.extend( coefficientStorage,
+				(OutOfBoundsFactory<S,RandomAccessibleInterval<S>>)oobFactory);
+	}
+
+	public BSplineLazyCoefficientsInterpolatorFactory( final RandomAccessible<T> img, final Interval interval,
+			final int order, final boolean clipping, S coefficientType,
+			final int[] blockSize )
+	{
+		this( img, interval, order, clipping, coefficientType, blockSize, new OutOfBoundsConstantValueFactory<>( new DoubleType() ));
 	}
 
 	public BSplineLazyCoefficientsInterpolatorFactory( final RandomAccessible<T> img,
 			final int order, final boolean clipping, S coefficientType,
-			final int[] blockSize )
+			final int[] blockSize,  final OutOfBoundsFactory<?,?> oobFactory )
 	{
 		this.order = order;
 		this.clipping = clipping;
 		this.blockSize = blockSize;
 		this.coefficientType = coefficientType;
+		this.oobFactory = oobFactory;
 
 		// TODO how big can we make this?
 		long[] min = new long[ img.numDimensions() ];
@@ -136,6 +158,13 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 		coefficientStorage = Views.translate( coefficientsBase, min );
 
 		coefficientAccess = Views.extendZero( coefficientStorage );
+	}
+
+	public BSplineLazyCoefficientsInterpolatorFactory( final RandomAccessible<T> img,
+			final int order, final boolean clipping, S coefficientType,
+			final int[] blockSize )
+	{
+		this( img, order, clipping, coefficientType, blockSize, new OutOfBoundsConstantValueFactory<>( new DoubleType() ));
 	}
 
 	@SuppressWarnings("unchecked")

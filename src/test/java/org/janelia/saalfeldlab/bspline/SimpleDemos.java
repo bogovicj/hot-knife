@@ -46,17 +46,17 @@ public class SimpleDemos
 		 * Choose an interpolation method below:
 		 */
 //		RealRandomAccessible<T> realImg = interpolateOnTheFly( (RandomAccessibleInterval<T>) img, bsplineOrder );
-//		RealRandomAccessible<DoubleType> realImg = interpolateCoefficients( (RandomAccessibleInterval<T>) img, bsplineOrder );
-		RealRandomAccessible<DoubleType> realImg = interpolateLazyCachedCoefficients( (RandomAccessibleInterval<T>) img, bsplineOrder );
+		RealRandomAccessible<DoubleType> realImg = interpolateCoefficients( (RandomAccessibleInterval<T>) img, bsplineOrder );
+//		RealRandomAccessible<DoubleType> realImg = interpolateLazyCachedCoefficients( (RandomAccessibleInterval<T>) img, bsplineOrder );
 //		RealRandomAccessible<DoubleType> realImg = interpolateLazyCachedCoefficientsInfinite( (RandomAccessibleInterval<T>) img, bsplineOrder );
 
 
 		/*
 		 * Interpolate an infinite image using cached coefficients
 		 */
-		RandomAccessible<DoubleType> chirp = cosImg( new double[]{ 0.5, 0.1, 0.05 } );
-		RealRandomAccessible<DoubleType> chirpRealInf = interpolateLazyCachedCoefficientsInfinite( 
-				(RandomAccessible<DoubleType>)chirp, bsplineOrder );
+		RandomAccessible<DoubleType> cos = cosImg( new double[]{ 0.5, 0.1, 0.05 } );
+		RealRandomAccessible<DoubleType> cosRealInf = interpolateLazyCachedCoefficientsInfinite( 
+				(RandomAccessible<DoubleType>)cos, bsplineOrder );
 
 
 		/*
@@ -68,11 +68,12 @@ public class SimpleDemos
 		bdvReal.setDisplayRangeBounds( 0, 255 );
 		bdvReal.setDisplayRange( 0, 255 );
 
-		BdvStackSource<DoubleType> bdv2 = BdvFunctions.show( chirp, img, "chirp", opts.addTo( bdv ));
+
+		BdvStackSource<DoubleType> bdv2 = BdvFunctions.show( cos, img, "cos", opts.addTo( bdv ));
 		bdv2.setDisplayRangeBounds( -255, 255 );
 		bdv2.setDisplayRange( -1, 1 );
 
-		BdvStackSource<DoubleType> bdv3 = BdvFunctions.show( chirpRealInf, img, "chirp interp", opts.addTo( bdv ));
+		BdvStackSource<DoubleType> bdv3 = BdvFunctions.show( cosRealInf, img, "cos interp", opts.addTo( bdv ));
 		bdv3.setDisplayRangeBounds( -255, 255 );
 		bdv3.setDisplayRange( -1, 1 );
 	}
@@ -131,7 +132,7 @@ public class SimpleDemos
 		DoubleType outputType = new DoubleType();
 
 		return Views.interpolate( img,
-				new BSplineCoefficientsInterpolatorFactory<>( Views.extendZero( img ), img, order, clipping, outputType ));
+				new BSplineCoefficientsInterpolatorFactory<>( img, order, clipping, outputType ));
 	}
 
 	/**
@@ -151,8 +152,9 @@ public class SimpleDemos
 		DoubleType outputType = new DoubleType();
 		int[] blockSize = new int[]{ 64, 64, 64 };
 
+		// uses zero expanded by default
 		return Views.interpolate( img,
-				new BSplineLazyCoefficientsInterpolatorFactory<>( Views.extendZero( img ), img, order, clipping, outputType, blockSize ));
+				new BSplineLazyCoefficientsInterpolatorFactory<>( img, img, order, clipping, outputType, blockSize ));
 	}
 
 	/**

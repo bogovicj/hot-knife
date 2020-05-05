@@ -43,12 +43,15 @@ import net.imglib2.RealRandomAccess;
 import net.imglib2.img.Img;
 import net.imglib2.img.ImgFactory;
 import net.imglib2.interpolation.InterpolatorFactory;
+import net.imglib2.outofbounds.OutOfBoundsConstantValueFactory;
+import net.imglib2.outofbounds.OutOfBoundsFactory;
 import net.imglib2.type.Type;
 import net.imglib2.type.numeric.RealType;
 import net.imglib2.type.numeric.real.DoubleType;
 import net.imglib2.util.Intervals;
 import net.imglib2.util.Util;
 import net.imglib2.view.ExtendedRandomAccessibleInterval;
+import net.imglib2.view.IntervalView;
 import net.imglib2.view.Views;
 
 public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S extends RealType<S>> implements InterpolatorFactory< S, RandomAccessible< T > >
@@ -59,31 +62,46 @@ public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S ext
 
 	protected final RandomAccessibleInterval<S> coefficients;
 	
-	// TODO
-//	protected OutOfBoundsFactory<S,RandomAccessibleInterval<S>> oobFactory;
+	protected OutOfBoundsFactory<?,?> oobFactory;
 
 	/**
 	 * Creates a new {@link BSplineCoefficientsInterpolatorFactory} using the BSpline 
 	 * interpolation in a certain window
 	 *
+	 * @param img
+	 * 			the random accessible to be interpolated
+	 * @param interval
+	 * 			the interval over which to do the interpolation and store
+	 * 			coefficients
 	 * @param order
 	 *            the order of the bspline
 	 * @param clipping
 	 *            the bspline-interpolation can create values that are bigger or
 	 *            smaller than the original values, so they can be clipped to
 	 *            the range of the {@link Type} if wanted
+	 * @param coefficientFactory
+	 * 			a factory used to create the coefficient image
+	 * @param oobFactory
+	 * 	  	    a factory specifying the out-of-bound policy to use 
 	 */
 	public BSplineCoefficientsInterpolatorFactory( 
 			final RandomAccessible<T> img,
 			final Interval interval,
 			final int order, 
 			final boolean clipping, 
-			final ImgFactory<S> coefficientFactory )
+			final ImgFactory<S> coefficientFactory,
+			final OutOfBoundsFactory<? extends RealType<?>, ?> oobFactory )
 	{
 		this.order = order;
 		this.clipping = clipping;
+		this.oobFactory = oobFactory;
 
-		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( order, img );
+		@SuppressWarnings("unchecked")
+		ExtendedRandomAccessibleInterval<T, IntervalView<T>> extendedImg = Views.extend( 
+				Views.interval( img, interval ), 
+				((OutOfBoundsFactory<T,RandomAccessibleInterval<T>>)oobFactory));
+
+		BSplineDecomposition<T,S> decomp = new BSplineDecomposition<>( order, extendedImg );
 
 		long[] min = Intervals.minAsLongArray( interval );
 		if( Arrays.stream( min ).allMatch( x -> x == 0 ) )
@@ -99,10 +117,12 @@ public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S ext
 		decomp.accept( coefficients );
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public BSplineCoefficientsInterpolatorFactory( final RandomAccessible<T> img, final Interval interval, final int order, final boolean clipping,
 			S coefficientType )
 	{
-		this( img, interval, order, clipping, Util.getSuitableImgFactory( interval, coefficientType ));
+		this( img, interval, order, clipping, Util.getSuitableImgFactory( interval, coefficientType ),
+				new OutOfBoundsConstantValueFactory( Util.getTypeFromInterval( Views.interval( img , interval ))));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -129,10 +149,12 @@ public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S ext
 		this( img, img, 3, true, (S)new DoubleType());
 	}
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
 	public BSplineCoefficientsInterpolatorFactory( final RandomAccessibleInterval<T> img,  final int order, final boolean clipping,
 			S coefficientType )
 	{
-		this( img, img, order, clipping, Util.getSuitableImgFactory( img, coefficientType ));
+		this( img, img, order, clipping, Util.getSuitableImgFactory( img, coefficientType ),
+				new OutOfBoundsConstantValueFactory( Util.getTypeFromInterval( img )));
 	}
 
 	@SuppressWarnings("unchecked")
@@ -150,10 +172,11 @@ public class BSplineCoefficientsInterpolatorFactory<T extends RealType<T>, S ext
 	@Override
 	public BSplineCoefficientsInterpolator<S> create( RandomAccessible<T> f )
 	{
-		// why doesn't this line work
-//		BSplineCoefficientsInterpolator<S>.build( order, Views.extendZero( coefficients ), (S) Util.getTypeFromInterval( coefficients ) );
-		
-		ExtendedRandomAccessibleInterval<S, RandomAccessibleInterval<S>> coefExt = Views.extendZero( coefficients );
+		@SuppressWarnings("unchecked")
+		ExtendedRandomAccessibleInterval<S, RandomAccessibleInterval<S>> coefExt = Views.extend( 
+				coefficients,
+				((OutOfBoundsFactory<S,RandomAccessibleInterval<S>>)oobFactory));
+
 		S type = Util.getTypeFromInterval( coefficients );
 		if( order % 2 == 0 )
 			return new BSplineCoefficientsInterpolatorEven<S>( order, coefExt, type.copy() );
