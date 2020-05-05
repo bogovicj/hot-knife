@@ -91,9 +91,10 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 	 *            smaller than the original values, so they can be clipped to
 	 *            the range of the {@link Type} if wanted
 	 */
+	@SuppressWarnings("unchecked")
 	public BSplineLazyCoefficientsInterpolatorFactory( final RandomAccessible<T> img, final Interval interval, 
 			final int order, final boolean clipping, S coefficientType,
-			final int[] blockSize, final OutOfBoundsFactory<?,?> oobFactory )
+			final int[] blockSize, final OutOfBoundsFactory<? extends RealType<?>,?> oobFactory )
 	{
 		this.order = order;
 		this.clipping = clipping;
@@ -102,7 +103,6 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 		this.coefficientType = coefficientType;
 		this.oobFactory = oobFactory;
 
-		@SuppressWarnings("unchecked")
 		ExtendedRandomAccessibleInterval<T, IntervalView<T>> extendedImg = Views.extend( 
 				Views.interval( img, interval ), 
 				((OutOfBoundsFactory<T,RandomAccessibleInterval<T>>)oobFactory));
@@ -134,7 +134,7 @@ public class BSplineLazyCoefficientsInterpolatorFactory<T extends RealType<T>, S
 
 	public BSplineLazyCoefficientsInterpolatorFactory( final RandomAccessible<T> img,
 			final int order, final boolean clipping, S coefficientType,
-			final int[] blockSize,  final OutOfBoundsFactory<?,?> oobFactory )
+			final int[] blockSize,  final OutOfBoundsFactory<? extends RealType<?>,?> oobFactory )
 	{
 		this.order = order;
 		this.clipping = clipping;
