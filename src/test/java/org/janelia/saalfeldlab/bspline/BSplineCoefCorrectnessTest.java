@@ -95,6 +95,10 @@ public class BSplineCoefCorrectnessTest
 						polynomial1dZ( -1, new double[]{ 31, 32, 33 } ));
 	}
 
+	/**
+	 * Test that splines of order N can correctly interpolate polynomials up to degree N 
+	 * in one dimension.
+	 */
 	@Test
 	public void testSplines1d()
 	{
@@ -124,6 +128,10 @@ public class BSplineCoefCorrectnessTest
 		runTest( 5, cubic1d, "cubic", coefItvl1d, testItvl1d, delta );
 	}
 
+	/**
+	 * Test that splines of order N can correctly interpolate polynomials up to degree N 
+	 * in two dimensions.
+	 */
 	@Test
 	public void testSplines2d()
 	{
@@ -264,6 +272,16 @@ public class BSplineCoefCorrectnessTest
 		return new FunctionRealRandomAccessible<>( 1, polynomial1dZ( scale, zeros ), DoubleType::new );
 	}
 
+	/**
+	 * Generate a polynomial with zeros at the specified locations, and scaled by the specified amount.
+	 * 
+	 * The polynomial is therefore:
+	 * 	  s * (x - z[0]) * (x - z[1]) * ... * (x - z[N-1])
+	 * 
+	 * @param scale the scale (s)
+	 * @param zeros the zeros (z)
+	 * @return
+	 */
 	public static BiConsumer< RealLocalizable, DoubleType > polynomial1dZ( final double scale, final double[] zeros )
 	{
 		return new BiConsumer<RealLocalizable, DoubleType >()
@@ -287,6 +305,17 @@ public class BSplineCoefCorrectnessTest
 				}
 			};
 	}
+
+	/**
+	 * Return a polynomial with the specified coefficients.  The coefficient at index i of the array
+	 * is coefficient for order i.  
+	 * 
+	 * The polynomial is therefore:
+	 * 	  c[0] + c[1]x + c[2]*x^2 + ... + c[N-1] * x^(N-1)
+	 * 
+	 * @param coefs the coefficients 
+	 * @return the polynomial function
+	 */
 	public static BiConsumer< RealLocalizable, DoubleType > polynomial1dC( final double[] coefs )
 	{
 		return new BiConsumer<RealLocalizable, DoubleType >()
